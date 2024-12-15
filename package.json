@@ -1,0 +1,15 @@
+{
+  "name": "cache-graph",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch ./src/index.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2"
+  }
+}
