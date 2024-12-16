@@ -1,3 +1,5 @@
+import { redisClient } from "./redis-client";
+
 const randoNum = async ({
   name,
   age,
@@ -54,10 +56,13 @@ const withCache = async <TArgs extends unknown[], TReturn>({
   const rawValue = await get(cacheKey);
 
   if (rawValue) {
+    console.log("got from cache");
     return JSON.parse(rawValue) as TReturn;
   }
 
   const newVal = await fetchFn(...funcArgs);
+  console.log("gonna set ");
+  console.log({ key: cacheKey, value: JSON.stringify(newVal) });
   await set({ key: cacheKey, value: JSON.stringify(newVal) });
   return newVal;
 };
@@ -65,7 +70,7 @@ const withCache = async <TArgs extends unknown[], TReturn>({
 // a function that takes everything except args, and then returns a function
 // that lets the user provide args
 // just takes everything... except the args?
-const genWithCache = <TArgs extends unknown[], TReturn>(
+export const cachify = <TArgs extends unknown[], TReturn>(
   withCacheArgs: Omit<withCacheArgs<TArgs, TReturn>, "funcArgs">,
 ) => {
   return async (...funcArgs: TArgs) => {
@@ -98,7 +103,7 @@ const test = async () => {
   });
 
   // ok now try generating that withCache function
-  const cachedRandoNumber = genWithCache({
+  const cachedRandoNumber = cachify({
     fetchFn: randoNum,
     genKey: ({ name, age }) => `${name}-${age}`,
     set: async ({ key, value }) => {
