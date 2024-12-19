@@ -1,47 +1,9 @@
-import { redisClient } from "./redis-client";
-
-const randoNum = async ({
-  name,
-  age,
-}: {
-  name: string;
-  age: number;
-}): Promise<number> => {
-  return new Promise((resolve) => {
-    const delay = Math.floor(Math.random() * 2000); // Random delay up to 2 seconds
-    setTimeout(() => {
-      const randomNumber = Math.random(); // Random number between 0 and 1
-      resolve(randomNumber);
-    }, delay);
-  });
-};
-
-// need to detangle how the HOC fits in. I guess I give users an HOC generator?
-// or instead of cacheInterface I could just give em a "set" function.
-// then the result of the HOC is what the register in the graph?
-type FetchFunction<TArgs extends unknown[], TReturn> = (
-  ...args: TArgs
-) => Promise<TReturn>;
-
-// ok fetch function is actually a thunk. And genKey should be too, with the same type but returns string
-type FetchFunctionThunk<TArgs extends unknown[], TReturn> = () => FetchFunction<
-  TArgs,
-  TReturn
->;
-
-// JK there is not really a way for the HOC to force the genKey args to match the fetch args.
-// Since the fetch func itself is a thunk, the guts of the function call (where the args are)
-// don't appear in the type signature. So you can't infer them. They're an implementation detail of
-// () =>
-
 export type withCacheArgs<TArgs extends unknown[], TReturn> = {
-  fetchFn: FetchFunction<TArgs, TReturn>;
+  fetchFn: (...args: TArgs) => Promise<TReturn>;
   funcArgs: TArgs;
   genKey: (...args: TArgs) => string;
   set: ({ key, value }: { key: string; value: string }) => Promise<any>;
   get: (key: string) => Promise<string | null>;
-  // not sure if this is necessary but feels important
-  tag: string;
 };
 
 const withCache = async <TArgs extends unknown[], TReturn>({
@@ -50,98 +12,53 @@ const withCache = async <TArgs extends unknown[], TReturn>({
   genKey,
   get,
   set,
-  tag,
 }: withCacheArgs<TArgs, TReturn>) => {
   const cacheKey = genKey(...funcArgs);
   const rawValue = await get(cacheKey);
 
   if (rawValue) {
-    console.log("got from cache");
     return JSON.parse(rawValue) as TReturn;
   }
 
   const newVal = await fetchFn(...funcArgs);
-  console.log("gonna set ");
-  console.log({ key: cacheKey, value: JSON.stringify(newVal) });
   await set({ key: cacheKey, value: JSON.stringify(newVal) });
   return newVal;
 };
 
-// a function that takes everything except args, and then returns a function
-// that lets the user provide args
-// just takes everything... except the args?
-export const cachify = <TArgs extends unknown[], TReturn>(
-  withCacheArgs: Omit<withCacheArgs<TArgs, TReturn>, "funcArgs">,
-) => {
-  return async (...funcArgs: TArgs) => {
-    return withCache({
-      ...withCacheArgs,
-      funcArgs,
-    });
+// takes get and set, return cachify
+export const genCachify = <TArgs extends unknown[], TReturn>({
+  get,
+  set,
+}: Pick<withCacheArgs<TArgs, TReturn>, "get" | "set">) => {
+  return <TArgs extends unknown[], TReturn>(
+    withCacheArgs: Omit<withCacheArgs<TArgs, TReturn>, "funcArgs" | "get" | "set">,
+  ) => {
+    return async (...funcArgs: TArgs) => {
+      return withCache({
+        ...withCacheArgs,
+        funcArgs,
+        get,
+        set,
+      });
+    };
   };
 };
 
-// maybe with cache needs to return another function after all, so args can be passed in??
-const test = async () => {
-  const thing = await withCache({
-    fetchFn: randoNum,
-    funcArgs: [
-      {
-        age: 10,
-        name: "me",
-      },
-    ],
-    genKey: ({ name, age }) => `${name}-${age}`,
-    set: async ({ key, value }) => {
-      // Implement your set function here
-    },
-    get: async (key) => {
-      // Implement your get function here
-      return null;
-    },
-    tag: "exampleTag",
-  });
-
-  // ok now try generating that withCache function
-  const cachedRandoNumber = cachify({
-    fetchFn: randoNum,
-    genKey: ({ name, age }) => `${name}-${age}`,
-    set: async ({ key, value }) => {
-      // Implement your set function here
-    },
-    get: async (key) => {
-      // Implement your get function here
-      return null;
-    },
-    tag: "exampleTag",
-  });
-
-  const plsMang = await cachedRandoNumber({ age: 100, name: "johnny" });
-};
-
-const withCacheIdentity = <TArgs extends unknown[], TReturn>() => {};
+// ## FUNCTION NODES ##
+// each function node will have a cachified function, a list of parent nodes.
+// when you call a function, you will also have to provide the args of the parent nodes'
+// genCacheKey functions.
 
 // I guess each function node has an async function, and children.
 // children are just any other nodes
 // if you actually want to infer the correct types of the whole tree for whatever reason,
 // you'll probs have to use mapped types with infer (to avoid passing any to the children generic)
+
+// ACTUALLY i=
 type FancyFunctionNode<TArgs extends unknown[], TReturn> = {
-  func: (...args: TArgs) => Promise<TReturn>;
-  genKey: (args: TArgs) => string;
+  func: typeof withCache;
   children?: FancyFunctionNode<any, any>[];
 };
-
-const fancyFuncIdentity = <TArgs extends unknown[], TReturn>(
-  funcNode: FancyFunctionNode<TArgs, TReturn>,
-) => {
-  return funcNode;
-};
-
-// looks like this works
-// fancyFuncIdentity({
-// func: randoNum,
-// genKey: ([hello]) => hello,
-// })
 
 // https://stackoverflow.com/questions/72370457/generic-type-for-args
 
@@ -149,33 +66,59 @@ const fancyFuncIdentity = <TArgs extends unknown[], TReturn>(
 // FunctionNode isn't responsible for making sure the args to stringify are the same as the actual function args,
 // I just have another function that does that part
 
-type FunctionNode = {};
+// ok so I think that function node is more or less an instance of the HOF.
+// you stick cachified function calls in the graph as nodes.
 
-// how could you use something like this?
+// ok you can't just clear downstream caches based on function deps alone, you
+// have to consider the args used in the cache keys.
+// For instance, if you re-pull ripcurl's data, then you've used
+// getData({ clientName: "ripcurl" }), and you ONLY want to clear caches that
+// have that segment of the key.
+// But we can actually do that, as long as the cache keys are generated by the graph,
+// and not JUST the function alone.
+// For instance, every function dependent on getData({ clientName: "ripcurl" })
+// includes it's prefixes, you can just clear on those prefixes.
 
-const updateProfileNameNode = {
-  func: async (name: string) => {
-    console.log(`Updated profile name to ${name}`);
-  },
-  children: [
-    {
-      func: async () => {
-        console.log("Invalidating profile HTML");
-      },
-    },
-    {
-      func: async () => {
-        console.log("Refreshing related data");
-      },
-      children: [
-        {
-          func: async () => {
-            console.log("Recalculating user stats");
-          },
-        },
-      ],
-    },
-  ],
-};
+// This gets more difficult when you have a function that's dependent on multiple upstream
+// functions. Then you might even need to introduce an "or" condition that prefixes
+// based on ALL upstream caches, and clears based on any of them.
+// Might have to actually do a redis style serialization, where you can either have
+// a simple upstream cache key, or an array tagged with * or something
 
-// const funcNodeIdentity = <TNode extends
+// might be good to think about specific use cases with some example functions
+// dataPull(clientId: number)
+// => getAdset(adsetId: number)
+
+// let's say you have a caching strategy that assumes all dependent caches
+// are identifiable by parent cache keys. So you can assume that getAdset will be
+// prefixed by something like dataPull:306
+// that means
+// - getAdset will ALWAYS need to know how to generate its parents cache keys.
+//   For instance if you're calling getAdset(55), you'll also have to find
+//   the client ID that corresponds to adset 55, and then get the cacheKey for
+//   dataPull(306)
+
+// this means the type of any function node would need to know the args of the parent
+// function, so that could generate the cache key for the parent function.
+
+// Obvi this makes things more complicated, because then
+// 1. the cache key generator needs to be async
+// 2. generating a cache key now an expensive operation, which kinda ruins the point
+//    of caching it in the first place!
+// 3. If your function is a dependent of multiple upstream functions, you need to
+//    generate cache keys for each of them. So the more complicated and downstream
+//    your function is, the more expensive it is to cache things.
+
+// HOWEVER
+// you don't ALWAYS need to fetch a bunch of shit *all the time*. You only have to fetch
+// a bunch extra upstream cache params in the *worst* case. You might have everything,
+// or at least some of what you need already.
+// Like if you're caching getAdset, and you need a client name to create the upstream
+// cache. But that doesn't necessarily mean that genKey needs to go fetch it: it's quite
+// likely that you have it in scope already.
+// You just need the genCache function to understand that it's inheriting the arg types
+// of all upstream functions. Idk how the fuck to do that though lol
+
+// ACTUALLY it's probably better if function nodes contain their parents, not their children??
+// cause then you can recursively loop through parents, making sure that all of the args have been
+// provided.

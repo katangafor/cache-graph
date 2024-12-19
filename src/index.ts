@@ -5,53 +5,44 @@
 
 // first let's see if we can make graphs work
 import { redisClient } from "./redis-client";
-import { cachify } from "./graph";
+import { genCachify } from "./graph";
 
-// need to make sure I can cache stuff, then I can cache stuff with my HOC
+// need to make sure I can cache stuff, then I can cache stuff with my HOF
 
 // generate a random name and age
 const randoPerson = ({
   givenName,
 }: {
-  givenName: number;
+  givenName: string;
 }): Promise<{ name: string; age: number }> => {
   return new Promise((resolve) => {
     const delay = Math.floor(Math.random() * 500);
     setTimeout(() => {
-      const name = `Person ${givenName}`;
       const age = Math.floor(Math.random() * 100);
-      resolve({ name, age });
+      resolve({ name: givenName, age });
     }, delay);
   });
 };
+
+const cachify = genCachify({
+  get: redisClient.get,
+  set: redisClient.set,
+});
 
 const main = async () => {
   await redisClient.connect();
   await redisClient.clear();
 
-  const key = "apples";
-  await redisClient.set({
-    key,
-    value: "are banernos",
-  });
-
-  const val = await redisClient.get(key);
-  console.log(val);
-
-  // now cachify randoPerson
   const cachedRandoPerson = cachify({
     fetchFn: randoPerson,
     genKey: ({ givenName }) => `randoPerson:${givenName}`,
-    get: redisClient.get,
-    set: redisClient.set,
-    tag: "randoPerson",
   });
 
-  const person1 = await cachedRandoPerson({ givenName: 1 });
+  const person1 = await cachedRandoPerson({ givenName: "seanathan" });
   console.log(person1);
-  const person2 = await cachedRandoPerson({ givenName: 2 });
+  const person2 = await cachedRandoPerson({ givenName: "buxaplenty" });
   console.log(person2);
-  const person3 = await cachedRandoPerson({ givenName: 1 });
+  const person3 = await cachedRandoPerson({ givenName: "johann" });
   console.log(person3);
 };
 
