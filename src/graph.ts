@@ -163,17 +163,20 @@ type dumbNode<T extends funcObj> = {
 
 const makeFunctionNode = <T extends funcObj>(dumbNode: dumbNode<T>) => dumbNode;
 
-const thing = makeFunctionNode({
-  parentFns: {
-    getName: (name: string, lastName: string) => name,
-    getDoubleAge: (age: number, multiplier: number) => age * 2,
-  },
-  fn: (parentFuncArgs) => {
-    const { getDoubleAge, getName } = parentFuncArgs;
-    const apple = getDoubleAge[0];
+const exampleFuncs = {
+  getName: (name: string, lastName: string) => name,
+  getDoubleAge: (age: number, multiplier: number) => age * 2,
+};
+
+const myDumbFuncNode = makeFunctionNode({
+  parentFns: exampleFuncs,
+  fn: (parentFuncSigs) => {
+    // just giving em underscores to differentiate them from actual ones
+    const { getDoubleAge: getDoubleAgeSig, getName: getNameSig } = parentFuncSigs;
+    // I should be able to call those functions with the params I have in my tuples
+    const doubleAge = exampleFuncs.getDoubleAge(...getDoubleAgeSig);
     //    ^?
-    const banana = getDoubleAge[1];
+    const name = exampleFuncs.getName(...getNameSig);
     //    ^?
-    const orange = getDoubleAge[2];
   },
 });
