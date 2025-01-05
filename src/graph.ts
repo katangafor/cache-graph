@@ -122,3 +122,58 @@ type FancyFunctionNode<TArgs extends unknown[], TReturn> = {
 // ACTUALLY it's probably better if function nodes contain their parents, not their children??
 // cause then you can recursively loop through parents, making sure that all of the args have been
 // provided.
+
+// trying to make a non-recursive version to share on SO for help
+// part of the issue is how to actually format the parent functions' args?
+// like if you have two parent functions, are they all just in a tuple?
+// are they smushed together into the same args list? (no, how would you combine objects and regular params)
+// I feel like maybe you have to provide the name of the function as an obj property, then the arguments array as its value
+
+// so an MVP for this type would be:
+// you have two properties: a function called "fn" and a list (tuple or object? maybe try both) of parent functions called "parentFns"
+
+type FunctionNode<T> = {
+  // parentFns is a tuple of functions?? and somehow the type of each on is inferred?
+  // parentFns:
+};
+
+// ok first we need to see if TS can infer the types of multiple things in an array at once
+type typedTuple<T extends Function[]> = T;
+const myFuncs = [(name: string) => 5, (age: number) => {}];
+
+type UnionOfArgs<T extends readonly Function[]> = T[number] extends (...args: any) => any
+  ? Parameters<T[number]>[number]
+  : never;
+
+type argUnion = UnionOfArgs<typeof myFuncs>;
+
+// ok so you can infer a whole union of stuff. So it must be possible to infer the function arguments of an object full of functions??
+type funcObj = {
+  [key: string]: (...args: any) => any;
+};
+
+type funcObjArgs<T extends funcObj> = {
+  [K in keyof T]: Parameters<T[K]>;
+};
+
+type dumbNode<T extends funcObj> = {
+  parentFns: T;
+  fn: (parentFnArgs: funcObjArgs<T>) => any;
+};
+
+const makeFunctionNode = <T extends funcObj>(dumbNode: dumbNode<T>) => dumbNode;
+
+const thing = makeFunctionNode({
+  parentFns: {
+    getName: (name: string, lastName: string) => name,
+    getDoubleAge: (age: number, multiplier: number) => age * 2,
+  },
+  fn: (parentFuncArgs) => {
+    const { getDoubleAge, getName } = parentFuncArgs;
+    const apple = getDoubleAge[0];
+    //    ^?
+    const banana = getDoubleAge[1];
+    //    ^?
+    const orange = getDoubleAge[2];
+  },
+});
