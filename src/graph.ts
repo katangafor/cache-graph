@@ -180,3 +180,9 @@ const myDumbFuncNode = makeFunctionNode({
     //    ^?
   },
 });
+
+// ok I can infer an object's worth of function arguments, and they're associated to the function by name.
+// I think that the function nodes will need a keygen function specificied explicitly: a cachified function
+// has the exact same signature as the func itself, just with extra side effects. So you can't figure out
+// how to generate a cache key from the cachified function. The genkey needs to be provided so that children
+// can correctly generate the cache keys for their parents.
