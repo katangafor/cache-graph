@@ -239,3 +239,71 @@ const myCacheableFuncNode = makeCacheableFnNode({
 // Then I'll need to get a funcNode working that only has cacheables, instead of functions.
 
 // NOTE the idea might be easier to explain using dumbFuncNode, so keep it around for SO posts n such
+
+// OK LOL this whole time I was thinking about cache trees that only depend on prefixes, but there are
+// tons (maybe most) instances where a side-effect is invalidating a cache, and has nothing to do with cache keys.
+
+// what does the current setup even solve? just that literal direct descendants could be invalidated? doesn't
+// that assume redundant caching in the first place?
+
+// you need to include functions that only have side effects in the graph. Like "setName" needs to invalidate "getName".
+// So... how does that work? Is setName a parent of getName? and it has a genKey function?
+
+// Or does it have to work the other way around? setName needs to depend on getName so that it can generate a key.
+
+// OK TURNS OUT I TOTALLY LOST THE PLOT and idk what I was even thinking about
+// you don't usually need a graph. maybe ever.
+// the primary use case is this:
+// ---
+// a cache could be made invalid by side effects of other functions.
+// pretend that shopify generates html for its storefronts.
+
+// getProfile gets your user profile, and shows a list of your best friends
+// if any of your friends change their names, your cache is invalidated.
+
+// I guess if the cache key included the IDs of your best friends... you could
+
+// ok let's think through a whole scenario
+// getUserProfile depends on
+// user name
+// bio
+// profile picture
+// best friend records
+// names of best friends
+
+// I guess the idea is that you would encode ALL of that information into the cache key. You're making
+// the explicit arguments implicit.
+
+// So if the args are different, do you even have to invalidate it? Like if you're fetching
+// profile-4:bestfriends-4,6,3, then you won't retrieve the cached profile-4:bestfriends-1,2,3 by accident.
+// But then you have to re-grab ALL of that data anytime you want to set OR get a profile. Which is slow as fuck and
+// ruins the point.
+
+// I think that was basically my original idea: make the implicit arguments explicit. It would probably work for
+// my client -> adset example, since clientId is a pretty mf basic implicit dep of adset. And the cost of fetching
+// a client ID from an adset ID is negligible compared to the cost of calculating an adset CPR or something.
+
+// So you'd say dataPull(clientId) invalidates getAdset(adsetId). So keys need to be constructed in a way
+// where when I clear clientId, adset is also cleared. So the key will be client-4:adset-5
+
+// So maybe the easy-mode version is: help devs turn implicit deps to explicit deps in cache keys.
+// It probably works fine for simple cases where the cost of getting the extra args together is tiny compared
+// to the cost of getting the data.
+
+// Although maybe you don't actually need to
+
+// or maybe you just map an arg from each function to the ID of the cache key idk
+
+// it's SETS
+// if a function can be invalidated by a parent fn, then it's in the parent fn's set
+// if it can be invalidated by two functions, then its in TWO sets
+// so how do you store everything? make a key normally, but then also put that generated
+// key in a set of keys?
+// like:
+// adsetId-6 is the cache key
+// clientId-7 is a set of [adsetId-6]
+// when you call dataPull(clientId = 7), you know you need to clear everything in that set
+// how do you come up with the set though? that has to happen when you cache things in the first place
+
+// so you check for a cache hit, and if it doesn't hit, when you write to the cache you also have to
+// write to all your sets
