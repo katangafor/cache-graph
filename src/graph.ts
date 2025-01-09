@@ -306,4 +306,50 @@ const myCacheableFuncNode = makeCacheableFnNode({
 // how do you come up with the set though? that has to happen when you cache things in the first place
 
 // so you check for a cache hit, and if it doesn't hit, when you write to the cache you also have to
-// write to all your sets
+// write to all your sets.
+
+// when you call a side effect fn, you find its set name, and invalidate everything in the set.
+
+// ---
+// let's simulate a cache in action
+// getAdset(5). The genKey function knows that dataPull(clientId) is a dep, so it
+// forces you to also provide clientId, which is 9
+// getAdset(5) result is cached => adset-5
+// at the same time, this entry now belongs *in the set of all entries
+// that can be invalidated by someone calling dataPull(9). This is recorded
+// with an entry idk like purgeableDataPull(9) => [adset-5]. I guess the parent
+// functions are required to have a genKey as well, so that the primary function they can decide on their
+// set names.
+
+// you fetch some more adsets, and you're cache ends up lookin like this:
+// adset-5   => stuff
+// adset-12  => stuff
+// adset-53  => stuff
+// purgeableDataPull(9)  => [adset-5, adset-12]
+// purgeableDataPull(12) => [adset-53]
+
+// so now you have three cached adsets, and they're all recorded in purgeable sets.
+// When you're checking for cache hits, you can just check using the genKey of your primary function.
+// When you run dataPull(12), (which has been re-exported, and given the extra cache-clearing side-effect), it
+// runs its genKey function to find the entries in purgeableDataPull(12), and proceeds to remove both the set
+// and the keys from the set. Leaving you with:
+
+// adset-5   => stuff
+// adset-12  => stuff
+// purgeableDataPull(9)  => [adset-5, adset-12]
+// ---
+
+// I THINK THAT'S IT
+// if you have multiple parent fns, when you delete a set, the OTHER set will end up with keys that
+// don't point to anything. I think that's probably fine, since you don't read via these keys. It's
+// just a list of keys to delete anyway.
+
+// WAIT FUCK
+// you don't need to provide the parent fn arguments in case of a cache miss, but you DON'T need to provide them otherwise.
+// So you need to provide a function that will fetch the rest of the arguments. Then in the generated parent fn with the injected extra
+// shit, you conditionally run that func.
+
+// So
+// - all parent fns need to implement a genKey function using their args
+// - upon caching, the primary fn inserts its own entry normally, then runs the genKey functions for each function
+// - when you
