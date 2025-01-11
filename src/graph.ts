@@ -406,16 +406,34 @@ export const makeCacheAware = <
   // the parent fns
   const gussiedUp = async (...args: TFnArgs) => {
     // check for a cache hit using the primary genKey
-
     // if cache hit, return hit
+    console.log("***");
+    console.log("gussied up");
+    const cacheKey = funcNode.genKey(...args);
+    console.log(`cacheKey --> ${cacheKey}`);
+    const cachedValue = await cache.get(cacheKey);
+    if (cachedValue) {
+      console.log("cache hit! Value is");
+      console.log(JSON.parse(cachedValue));
+      // uh I guess assume that the cache contains the same type that the function returns.
+      return JSON.parse(cachedValue) as TFnReturn;
+    }
+    console.log("cache miss!");
 
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
-    // key into the function. Set the key
-    console.log("hey bb I am gussied up");
-    await cache.set({ key: "gussied", value: "UP" });
+    // TEMP skip the parent stuff, and just try to cache it
+    const value = funcNode.fn(...args);
+    console.log("setting new value of");
+    console.log(value);
+    await cache.set({ key: cacheKey, value: JSON.stringify(value) });
+    return value;
 
-    const parentArgs = funcNode.getInvalidatorArgs(...args);
-    return parentArgs;
+    // key into the function. Set the key
+    // console.log("hey bb I am gussied up");
+    // await cache.set({ key: "gussied", value: "UP" });
+
+    // const parentArgs = funcNode.getInvalidatorArgs(...args);
+    // return parentArgs;
   };
   return { gussiedUp };
 };

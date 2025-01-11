@@ -9,6 +9,10 @@ import { genCachify, makeCacheAware, cacheableFnArg } from "./graph";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
+const randInt = () => {
+  return Math.floor(Math.random() * 100);
+};
+
 const main = async () => {
   await redisClient.connect();
   await redisClient.clear();
@@ -32,14 +36,19 @@ const main = async () => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
       fn: (id) => {
-        console.log("idk do something");
+        return randInt();
       },
-      genKey: (id) => id.toString(),
+      genKey: (id) => `gussiedUpKey:${id.toString()}`,
     },
     redisClient,
   );
 
-  const idk = await gussiedUp(8);
+  await gussiedUp(8);
+  await gussiedUp(8);
+  await gussiedUp(8);
+  await gussiedUp(10);
+  await gussiedUp(10);
+  await gussiedUp(10);
 };
 
 main();
