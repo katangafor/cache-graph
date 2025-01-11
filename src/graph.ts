@@ -106,7 +106,7 @@ type cacheableObj = {
 // difference between funcs and cacheables is that while the functions can be anything,
 // the cacheable for fn needs to get its args from parentFns
 export type cacheableFnArg<T extends cacheableObj> = {
-  [K in keyof T]: Parameters<T[K]["fn"]>;
+  [K in keyof T]: Parameters<T[K]["genKey"]>;
 };
 
 // type cacheableFnNode<T extends cacheableObj> = {
@@ -125,7 +125,8 @@ const exampleCacheables = {
   },
   getDoubleAge: {
     fn: (age: number, multiplier: number) => age * 2,
-    genKey: (age: number, multiplier: number) => `age:${age}:${multiplier}`,
+    // for instance, say we don't need multiplier in the cache
+    genKey: (age: number) => `age:${age}`,
   },
 };
 
@@ -377,7 +378,7 @@ const myCacheableFuncNode2 = makeCacheableFnNode2({
   parentFns: exampleCacheables,
   // this only works with the annotation
   getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
-    return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
+    return { getDoubleAge: [5], getName: ["jaw", "knee"] };
   },
   fn: (id) => {
     console.log("idk do something");

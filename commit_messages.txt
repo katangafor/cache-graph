@@ -1,0 +1,14 @@
+noice
+got some stuff in place for messing with actual cache
+Merge branch 'main' of https://github.com/katangafor/cache-graph
+noice
+idk
+Merge branch 'main' of https://github.com/katangafor/cache-graph
+somenotes
+looks non-recursive function node is working with cacheables
+nothin
+ok yea I think the most basic explanation of the idea is working
+making some progress on inferring multiple func args, but getting tuples instead of objects (actually I think it is working?? I have an object where the property names are functions, and the values are tuples representing the func args:wq )
+messin with genCachify I guess but idk
+my HOC works sick as fuuuuuck
+some basic cache types working

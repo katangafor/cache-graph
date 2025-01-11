@@ -40,8 +40,6 @@ const main = async () => {
   );
 
   const idk = await gussiedUp(8);
-  console.log("idk result is");
-  console.log(idk);
 };
 
 main();
