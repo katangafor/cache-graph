@@ -107,14 +107,14 @@ type cacheableFnArg<T extends cacheableObj> = {
   [K in keyof T]: Parameters<T[K]["fn"]>;
 };
 
-type cacheableFnNode<T extends cacheableObj> = {
-  parentFns: T;
-  fn: (parentFnArgs: cacheableFnArg<T>) => any;
-};
+// type cacheableFnNode<T extends cacheableObj> = {
+//   parentFns: T;
+//   fn: (parentFnArgs: cacheableFnArg<T>) => any;
+// };
 
-const makeCacheableFnNode = <T extends cacheableObj>(
-  cacheableFnNode: cacheableFnNode<T>,
-) => cacheableFnNode;
+// const makeCacheableFnNode = <T extends cacheableObj>(
+//   cacheableFnNode: cacheableFnNode<T>,
+// ) => cacheableFnNode;
 
 const exampleCacheables = {
   getName: {
@@ -127,14 +127,14 @@ const exampleCacheables = {
   },
 };
 
-const myCacheableFuncNode = makeCacheableFnNode({
-  parentFns: exampleCacheables,
-  fn: (parentFuncSigs) => {
-    const { getDoubleAge: getDoubleAgeSig, getName: getNameSig } = parentFuncSigs;
-    const doubleAge = exampleCacheables.getDoubleAge.fn(...getDoubleAgeSig);
-    const name = exampleCacheables.getName.fn(...getNameSig);
-  },
-});
+// const myCacheableFuncNode = makeCacheableFnNode({
+//   parentFns: exampleCacheables,
+//   fn: (parentFuncSigs) => {
+//     const { getDoubleAge: getDoubleAgeSig, getName: getNameSig } = parentFuncSigs;
+//     const doubleAge = exampleCacheables.getDoubleAge.fn(...getDoubleAgeSig);
+//     const name = exampleCacheables.getName.fn(...getNameSig);
+//   },
+// });
 
 // ok I can infer an object's worth of function arguments, and they're associated to the function by name.
 // I think that the function nodes will need a keygen function specificied explicitly: a cachified function
@@ -345,11 +345,63 @@ const myCacheableFuncNode = makeCacheableFnNode({
 // just a list of keys to delete anyway.
 
 // WAIT FUCK
-// you don't need to provide the parent fn arguments in case of a cache miss, but you DON'T need to provide them otherwise.
+// you do need to provide the parent fn arguments in case of a cache miss, but you DON'T need to provide them otherwise.
 // So you need to provide a function that will fetch the rest of the arguments. Then in the generated parent fn with the injected extra
 // shit, you conditionally run that func.
 
-// So
-// - all parent fns need to implement a genKey function using their args
-// - upon caching, the primary fn inserts its own entry normally, then runs the genKey functions for each function
-// - when you
+// So the primary fn needs to have a function can that can fill in the
+// args of the parent fns. How do you provide this? it must be required by funcNode.
+// What exactly is it?
+// an function that takes the args of primary, and returns the args of the funcs??
+
+type cacheableFnNode2<
+  TParentFns extends cacheableObj,
+  TFnArgs extends unknown[],
+  TFnReturn,
+> = {
+  parentFns: TParentFns;
+  // instead of providing the args, it needs to return the args.
+  // The args of fn are now their own
+  getParentArgs: (...args: TFnArgs) => cacheableFnArg<TParentFns>;
+  fn: (...args: TFnArgs) => TFnReturn;
+  genKey: (...args: TFnArgs) => string;
+};
+
+const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
+  cacheableFnNode: cacheableFnNode2<T, K, J>,
+) => cacheableFnNode;
+
+const myCacheableFuncNode2 = makeCacheableFnNode2({
+  parentFns: exampleCacheables,
+  // this only works with the annotation
+  getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+    return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
+  },
+  fn: (id) => {
+    console.log("idk do something");
+  },
+  genKey: (id) => id.toString(),
+});
+
+// ok it sucks but for now we need the type annotation. Probs SO can help.
+// Moving on, this describes the information that we need from a function node.
+// But a function node is really just the argument for the actual function!
+
+// we need to make a function that takes a function node, and implements all the fancy shit
+// - make a logic'd-up version of the
+
+// let's see if we can make a function that takes a func node and does something with it
+const doStuff = <TParentFns extends cacheableObj, TFnArgs extends unknown[], TFnReturn>(
+  funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
+) => {
+  // takes the same args as the regular function, but also gets args for
+  // the parent fns
+  const gussiedUp = (...args: TFnArgs) => {
+    // I guess... get the parent args??
+    const parentArgs = funcNode.getParentArgs(...args);
+    return parentArgs;
+  };
+  return { gussiedUp };
+};
+
+export const { gussiedUp } = doStuff(myCacheableFuncNode2);
