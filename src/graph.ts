@@ -358,14 +358,14 @@ const exampleCacheables = {
 // an function that takes the args of primary, and returns the args of the funcs??
 
 type cacheableFnNode2<
-  TParentFns extends cacheableObj,
+  TInvalidatorFns extends cacheableObj,
   TFnArgs extends unknown[],
   TFnReturn,
 > = {
-  parentFns: TParentFns;
+  invalidatorFns: TInvalidatorFns;
   // instead of providing the args, it needs to return the args.
   // The args of fn are now their own
-  getParentArgs: (...args: TFnArgs) => cacheableFnArg<TParentFns>;
+  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
   fn: (...args: TFnArgs) => TFnReturn;
   genKey: (...args: TFnArgs) => string;
 };
@@ -375,9 +375,9 @@ const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
 ) => cacheableFnNode;
 
 const myCacheableFuncNode2 = makeCacheableFnNode2({
-  parentFns: exampleCacheables,
+  invalidatorFns: exampleCacheables,
   // this only works with the annotation
-  getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+  getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
     return { getDoubleAge: [5], getName: ["jaw", "knee"] };
   },
   fn: (id) => {
@@ -414,7 +414,7 @@ export const makeCacheAware = <
     console.log("hey bb I am gussied up");
     await cache.set({ key: "gussied", value: "UP" });
 
-    const parentArgs = funcNode.getParentArgs(...args);
+    const parentArgs = funcNode.getInvalidatorArgs(...args);
     return parentArgs;
   };
   return { gussiedUp };

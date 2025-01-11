@@ -26,9 +26,9 @@ const main = async () => {
 
   const { gussiedUp } = makeCacheAware(
     {
-      parentFns: exampleCacheables,
+      invalidatorFns: exampleCacheables,
       // this only works with the annotation :(
-      getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+      getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
       fn: (id) => {
