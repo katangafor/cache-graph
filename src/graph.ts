@@ -94,19 +94,19 @@ const myDumbFuncNode = makeFunctionNode({
 // we'll use these instead of functions in funcNodes. I don't think we'll have any raw functions? just these babies.
 // OK I can't make the cacheable example work 1-to-1 with the dumbFuncNode since cacheable is generic, so imma
 // remove the generic restriction FOR NOW to see what I can do
-type cacheable = {
+type invalidatorFn = {
   fn: (...args: any) => any;
-  genKey: (...args: any) => string;
+  genSetKey: (...args: any) => string;
 };
 
 type cacheableObj = {
-  [key: string]: cacheable;
+  [key: string]: invalidatorFn;
 };
 
 // difference between funcs and cacheables is that while the functions can be anything,
 // the cacheable for fn needs to get its args from parentFns
 export type cacheableFnArg<T extends cacheableObj> = {
-  [K in keyof T]: Parameters<T[K]["genKey"]>;
+  [K in keyof T]: Parameters<T[K]["genSetKey"]>;
 };
 
 // type cacheableFnNode<T extends cacheableObj> = {
@@ -121,12 +121,12 @@ export type cacheableFnArg<T extends cacheableObj> = {
 const exampleCacheables = {
   getName: {
     fn: (name: string, lastName: string) => name,
-    genKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
+    genSetKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
   },
   getDoubleAge: {
     fn: (age: number, multiplier: number) => age * 2,
     // for instance, say we don't need multiplier in the cache
-    genKey: (age: number) => `age:${age}`,
+    genSetKey: (age: number) => `age:${age}`,
   },
 };
 
