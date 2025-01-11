@@ -5,7 +5,7 @@
 
 // first let's see if we can make graphs work
 import { redisClient } from "./redis-client";
-import { genCachify } from "./graph";
+import { genCachify, gussiedUp } from "./graph";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
@@ -30,20 +30,26 @@ const cachify = genCachify({
 });
 
 const main = async () => {
-  await redisClient.connect();
-  await redisClient.clear();
+  // await redisClient.connect();
+  // await redisClient.clear();
 
-  const cachedRandoPerson = cachify({
-    fetchFn: randoPerson,
-    genKey: ({ givenName }) => `randoPerson:${givenName}`,
-  });
+  // const cachedRandoPerson = cachify({
+  //   fetchFn: randoPerson,
+  //   genKey: ({ givenName }) => `randoPerson:${givenName}`,
+  // });
 
-  const person1 = await cachedRandoPerson({ givenName: "seanathan" });
-  console.log(person1);
-  const person2 = await cachedRandoPerson({ givenName: "buxaplenty" });
-  console.log(person2);
-  const person3 = await cachedRandoPerson({ givenName: "johann" });
-  console.log(person3);
+  // const person1 = await cachedRandoPerson({ givenName: "seanathan" });
+  // console.log(person1);
+  // const person2 = await cachedRandoPerson({ givenName: "buxaplenty" });
+  // console.log(person2);
+  // const person3 = await cachedRandoPerson({ givenName: "johann" });
+  // console.log(person3);
+
+  const args = gussiedUp(7);
+  console.log("double age args are");
+  console.log(args.getDoubleAge);
+  console.log("name args are");
+  console.log(args.getName);
 };
 
 main();
