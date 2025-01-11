@@ -27,7 +27,7 @@ const main = async () => {
   const { gussiedUp } = makeCacheAware(
     {
       parentFns: exampleCacheables,
-      // this only works with the annotation
+      // this only works with the annotation :(
       getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
@@ -38,6 +38,10 @@ const main = async () => {
     },
     redisClient,
   );
+
+  const idk = await gussiedUp(8);
+  console.log("idk result is");
+  console.log(idk);
 };
 
 main();

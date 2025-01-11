@@ -403,7 +403,7 @@ export const makeCacheAware = <
 ) => {
   // takes the same args as the regular function, but also gets args for
   // the parent fns
-  const gussiedUp = (...args: TFnArgs) => {
+  const gussiedUp = async (...args: TFnArgs) => {
     // check for a cache hit using the primary genKey
 
     // if cache hit, return hit
@@ -411,6 +411,7 @@ export const makeCacheAware = <
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
     // key into the function. Set the key
     console.log("hey bb I am gussied up");
+    await cache.set({ key: "gussied", value: "UP" });
 
     const parentArgs = funcNode.getParentArgs(...args);
     return parentArgs;
