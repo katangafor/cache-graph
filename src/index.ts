@@ -5,51 +5,77 @@
 
 // first let's see if we can make graphs work
 import { redisClient } from "./redis-client";
-import { genCachify, gussiedUp } from "./graph";
+import { genCachify, makeCacheAware, cacheableFnArg } from "./graph";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
-// generate a random name and age
-const randoPerson = ({
-  givenName,
-}: {
-  givenName: string;
-}): Promise<{ name: string; age: number }> => {
-  return new Promise((resolve) => {
-    const delay = Math.floor(Math.random() * 500);
-    setTimeout(() => {
-      const age = Math.floor(Math.random() * 100);
-      resolve({ name: givenName, age });
-    }, delay);
-  });
-};
-
-const cachify = genCachify({
-  get: redisClient.get,
-  set: redisClient.set,
-});
-
 const main = async () => {
-  // await redisClient.connect();
-  // await redisClient.clear();
+  await redisClient.connect();
+  await redisClient.clear();
 
-  // const cachedRandoPerson = cachify({
-  //   fetchFn: randoPerson,
-  //   genKey: ({ givenName }) => `randoPerson:${givenName}`,
-  // });
+  const exampleCacheables = {
+    getName: {
+      fn: (name: string, lastName: string) => name,
+      genKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
+    },
+    getDoubleAge: {
+      fn: (age: number, multiplier: number) => age * 2,
+      genKey: (age: number, multiplier: number) => `age:${age}:${multiplier}`,
+    },
+  };
 
-  // const person1 = await cachedRandoPerson({ givenName: "seanathan" });
-  // console.log(person1);
-  // const person2 = await cachedRandoPerson({ givenName: "buxaplenty" });
-  // console.log(person2);
-  // const person3 = await cachedRandoPerson({ givenName: "johann" });
-  // console.log(person3);
-
-  const args = gussiedUp(7);
-  console.log("double age args are");
-  console.log(args.getDoubleAge);
-  console.log("name args are");
-  console.log(args.getName);
+  const { gussiedUp } = makeCacheAware(
+    {
+      parentFns: exampleCacheables,
+      // this only works with the annotation
+      getParentArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+        return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
+      },
+      fn: (id) => {
+        console.log("idk do something");
+      },
+      genKey: (id) => id.toString(),
+    },
+    redisClient,
+  );
 };
 
 main();
+
+// this is the old main with some cachify examples
+// generate a random name and age
+// const randoPerson = ({
+//   givenName,
+// }: {
+//   givenName: string;
+// }): Promise<{ name: string; age: number }> => {
+//   return new Promise((resolve) => {
+//     const delay = Math.floor(Math.random() * 500);
+//     setTimeout(() => {
+//       const age = Math.floor(Math.random() * 100);
+//       resolve({ name: givenName, age });
+//     }, delay);
+//   });
+// };
+
+// const cachify = genCachify({
+//   get: redisClient.get,
+//   set: redisClient.set,
+// });
+
+// const main = async () => {
+//   await redisClient.connect();
+//   await redisClient.clear();
+
+//   const cachedRandoPerson = cachify({
+//     fetchFn: randoPerson,
+//     genKey: ({ givenName }) => `randoPerson:${givenName}`,
+//   });
+
+//   const person1 = await cachedRandoPerson({ givenName: "seanathan" });
+//   console.log(person1);
+//   const person2 = await cachedRandoPerson({ givenName: "buxaplenty" });
+//   console.log(person2);
+//   const person3 = await cachedRandoPerson({ givenName: "johann" });
+//   console.log(person3);
+// };

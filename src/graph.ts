@@ -1,3 +1,5 @@
+import { cacheInterface } from "./cacheInterface";
+
 export type withCacheArgs<TArgs extends unknown[], TReturn> = {
   fetchFn: (...args: TArgs) => Promise<TReturn>;
   funcArgs: TArgs;
@@ -103,7 +105,7 @@ type cacheableObj = {
 
 // difference between funcs and cacheables is that while the functions can be anything,
 // the cacheable for fn needs to get its args from parentFns
-type cacheableFnArg<T extends cacheableObj> = {
+export type cacheableFnArg<T extends cacheableObj> = {
   [K in keyof T]: Parameters<T[K]["fn"]>;
 };
 
@@ -391,17 +393,32 @@ const myCacheableFuncNode2 = makeCacheableFnNode2({
 // - make a logic'd-up version of the
 
 // let's see if we can make a function that takes a func node and does something with it
-const doStuff = <TParentFns extends cacheableObj, TFnArgs extends unknown[], TFnReturn>(
+export const makeCacheAware = <
+  TParentFns extends cacheableObj,
+  TFnArgs extends unknown[],
+  TFnReturn,
+>(
   funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
+  cache: cacheInterface,
 ) => {
   // takes the same args as the regular function, but also gets args for
   // the parent fns
   const gussiedUp = (...args: TFnArgs) => {
-    // I guess... get the parent args??
+    // check for a cache hit using the primary genKey
+
+    // if cache hit, return hit
+
+    // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
+    // key into the function. Set the key
+    console.log("hey bb I am gussied up");
+
     const parentArgs = funcNode.getParentArgs(...args);
     return parentArgs;
   };
   return { gussiedUp };
 };
 
-export const { gussiedUp } = doStuff(myCacheableFuncNode2);
+// optimization: it'd be cool if the gussiedUp function had another argument, which was an partial of the
+// parent args. When you call getParentArgs, it only gets the args that haven't been provided.
+// That way if you happen to have something in scope (like a client ID), you can provide it,
+// and the caching is cheaper

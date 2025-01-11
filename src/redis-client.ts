@@ -1,10 +1,11 @@
 import { createClient } from "redis";
+import { cacheInterface } from "./cacheInterface";
 
 const client = createClient({
   url: "redis://localhost:6379",
 });
 
-export const redisClient = {
+export const redisClient: cacheInterface = {
   async connect() {
     await client.connect();
   },
