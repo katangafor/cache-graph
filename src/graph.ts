@@ -426,6 +426,19 @@ export const makeCacheAware = <
     console.log("setting new value of");
     console.log(value);
     await cache.set({ key: cacheKey, value: JSON.stringify(value) });
+
+    // ok let's also see if we can generate the setKeys for each of the invalidators
+    const invalidatorArgs = funcNode.getInvalidatorArgs(...args);
+    // for each key in invalidatorArgs, call that function with its args
+    for (const functionName of Object.keys(invalidatorArgs)) {
+      // generate the using the function's genKey and the generated args
+      const setKey = funcNode.invalidatorFns[functionName].genSetKey(
+        ...invalidatorArgs[functionName],
+      );
+      console.log("set key for " + functionName);
+      console.log(setKey);
+    }
+
     return value;
 
     // key into the function. Set the key
@@ -442,3 +455,10 @@ export const makeCacheAware = <
 // parent args. When you call getParentArgs, it only gets the args that haven't been provided.
 // That way if you happen to have something in scope (like a client ID), you can provide it,
 // and the caching is cheaper
+
+// to be uber fancy:
+// if you have a different function for fetching each set of args (so that they
+// can be called independently), then you can make cases like:
+// - if the function is not provided, then the genSetKey arguments themselves are always required?
+// - if you provide a function, arg to genSetKey is optional. If you provide it anyway,
+//   we can skip the built in fetcher
