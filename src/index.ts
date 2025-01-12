@@ -20,11 +20,11 @@ const main = async () => {
   const exampleCacheables = {
     getName: {
       fn: (name: string, lastName: string) => name,
-      genSetKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
+      genSetKey: (name: string, lastName: string) => `name-${name}-${lastName}`,
     },
     getDoubleAge: {
       fn: (age: number, multiplier: number) => age * 2,
-      genSetKey: (age: number, multiplier: number) => `age:${age}:${multiplier}`,
+      genSetKey: (age: number, multiplier: number) => `age-${age}-${multiplier}`,
     },
   };
 
@@ -38,7 +38,7 @@ const main = async () => {
       fn: (id) => {
         return randInt();
       },
-      genKey: (id) => `gussiedUpKey:${id.toString()}`,
+      genKey: (id) => `gussiedUpKey-${id.toString()}`,
     },
     redisClient,
   );

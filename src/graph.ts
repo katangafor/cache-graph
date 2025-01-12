@@ -437,6 +437,8 @@ export const makeCacheAware = <
       );
       console.log("set key for " + functionName);
       console.log(setKey);
+      // add the primary cache key as a value under this setKey
+      await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
     }
 
     return value;

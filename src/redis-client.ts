@@ -15,6 +15,9 @@ export const redisClient: cacheInterface = {
   async get(key: string) {
     return await client.get(key);
   },
+  async sadd({ set, value }) {
+    return await client.SADD(set, value);
+  },
   async clear() {
     return await client.flushAll();
   },
