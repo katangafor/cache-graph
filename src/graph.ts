@@ -46,54 +46,6 @@ export const genCachify = <TArgs extends unknown[], TReturn>({
   };
 };
 
-// trying to make a non-recursive version to share on SO for help
-// part of the issue is how to actually format the parent functions' args?
-// like if you have two parent functions, are they all just in a tuple?
-// are they smushed together into the same args list? (no, how would you combine objects and regular params)
-// I feel like maybe you have to provide the name of the function as an obj property, then the arguments array as its value
-
-// so an MVP for this type would be:
-// you have two properties: a function called "fn" and a list (tuple or object? maybe try both) of parent functions called "parentFns"
-
-// ok first we need to see if TS can infer the types of multiple things in an array at once
-
-// ok so you can infer a whole union of stuff. So it must be possible to infer the function arguments of an object full of functions??
-type funcObj = {
-  [key: string]: (...args: any) => any;
-};
-
-type funcObjArgs<T extends funcObj> = {
-  [K in keyof T]: Parameters<T[K]>;
-};
-
-type dumbNode<T extends funcObj> = {
-  parentFns: T;
-  fn: (parentFnArgs: funcObjArgs<T>) => any;
-};
-
-const makeFunctionNode = <T extends funcObj>(dumbNode: dumbNode<T>) => dumbNode;
-
-const exampleFuncs = {
-  getName: (name: string, lastName: string) => name,
-  getDoubleAge: (age: number, multiplier: number) => age * 2,
-};
-
-const myDumbFuncNode = makeFunctionNode({
-  parentFns: exampleFuncs,
-  fn: (parentFuncSigs) => {
-    // just giving em underscores to differentiate them from actual ones
-    const { getDoubleAge: getDoubleAgeSig, getName: getNameSig } = parentFuncSigs;
-    // I should be able to call those functions with the params I have in my tuples
-    const doubleAge = exampleFuncs.getDoubleAge(...getDoubleAgeSig);
-    //    ^?
-    const name = exampleFuncs.getName(...getNameSig);
-    //    ^?
-  },
-});
-
-// we'll use these instead of functions in funcNodes. I don't think we'll have any raw functions? just these babies.
-// OK I can't make the cacheable example work 1-to-1 with the dumbFuncNode since cacheable is generic, so imma
-// remove the generic restriction FOR NOW to see what I can do
 type invalidatorFn = {
   fn: (...args: any) => any;
   genSetKey: (...args: any) => string;
@@ -108,16 +60,6 @@ type cacheableObj = {
 export type cacheableFnArg<T extends cacheableObj> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>;
 };
-
-// type cacheableFnNode<T extends cacheableObj> = {
-//   parentFns: T;
-//   fn: (parentFnArgs: cacheableFnArg<T>) => any;
-// };
-
-// const makeCacheableFnNode = <T extends cacheableObj>(
-//   cacheableFnNode: cacheableFnNode<T>,
-// ) => cacheableFnNode;
-
 const exampleCacheables = {
   getName: {
     fn: (name: string, lastName: string) => name,
@@ -128,6 +70,103 @@ const exampleCacheables = {
     // for instance, say we don't need multiplier in the cache
     genSetKey: (age: number) => `age:${age}`,
   },
+};
+
+type cacheableFnNode2<
+  TInvalidatorFns extends cacheableObj,
+  TFnArgs extends unknown[],
+  TFnReturn,
+> = {
+  invalidatorFns: TInvalidatorFns;
+  // instead of providing the args, it needs to return the args.
+  // The args of fn are now their own
+  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
+  fn: (...args: TFnArgs) => TFnReturn;
+  genKey: (...args: TFnArgs) => string;
+};
+
+const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
+  cacheableFnNode: cacheableFnNode2<T, K, J>,
+) => cacheableFnNode;
+
+const myCacheableFuncNode2 = makeCacheableFnNode2({
+  invalidatorFns: exampleCacheables,
+  // this only works with the annotation
+  getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+    return { getDoubleAge: [5], getName: ["jaw", "knee"] };
+  },
+  fn: (id) => {
+    console.log("idk do something");
+  },
+  genKey: (id) => id.toString(),
+});
+
+// ok it sucks but for now we need the type annotation. Probs SO can help.
+// Moving on, this describes the information that we need from a function node.
+// But a function node is really just the argument for the actual function!
+
+// we need to make a function that takes a function node, and implements all the fancy shit
+// - make a logic'd-up version of the
+
+// let's see if we can make a function that takes a func node and does something with it
+export const makeCacheAware = <
+  TParentFns extends cacheableObj,
+  TFnArgs extends unknown[],
+  TFnReturn,
+>(
+  funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
+  cache: cacheInterface,
+): { gussiedUp: typeof funcNode.fn } => {
+  // takes the same args as the regular function, but also gets args for
+  // the parent fns
+  const gussiedUp = async (...args: TFnArgs) => {
+    // check for a cache hit using the primary genKey
+    // if cache hit, return hit
+    console.log("***");
+    console.log("gussied up");
+    const cacheKey = funcNode.genKey(...args);
+    console.log(`cacheKey --> ${cacheKey}`);
+    const cachedValue = await cache.get(cacheKey);
+    if (cachedValue) {
+      console.log("cache hit! Value is");
+      console.log(JSON.parse(cachedValue));
+      // uh I guess assume that the cache contains the same type that the function returns.
+      return JSON.parse(cachedValue) as TFnReturn;
+    }
+    console.log("cache miss!");
+
+    // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
+    // TEMP skip the parent stuff, and just try to cache it
+    const value = funcNode.fn(...args);
+    console.log("setting new value of");
+    console.log(value);
+    await cache.set({ key: cacheKey, value: JSON.stringify(value) });
+
+    // ok let's also see if we can generate the setKeys for each of the invalidators
+    const invalidatorArgs = funcNode.getInvalidatorArgs(...args);
+    // for each key in invalidatorArgs, call that function with its args
+    for (const functionName of Object.keys(invalidatorArgs)) {
+      // generate the using the function's genKey and the generated args
+      const setKey = funcNode.invalidatorFns[functionName].genSetKey(
+        ...invalidatorArgs[functionName],
+      );
+      console.log("set key for " + functionName);
+      console.log(setKey);
+      // add the primary cache key as a value under this setKey
+      await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
+    }
+
+    return value;
+  };
+
+  // ok now I need to gussy up the invalidators.
+  // All they need to do is make a function that
+  // - takes the same args as the fn
+  // - generates a setKey using the args
+  // - deletes every entry via the set keys, and the set itself
+  // ugh idk maybe it has the same keys as
+
+  return { gussiedUp };
 };
 
 // const myCacheableFuncNode = makeCacheableFnNode({
@@ -356,102 +395,6 @@ const exampleCacheables = {
 // args of the parent fns. How do you provide this? it must be required by funcNode.
 // What exactly is it?
 // an function that takes the args of primary, and returns the args of the funcs??
-
-type cacheableFnNode2<
-  TInvalidatorFns extends cacheableObj,
-  TFnArgs extends unknown[],
-  TFnReturn,
-> = {
-  invalidatorFns: TInvalidatorFns;
-  // instead of providing the args, it needs to return the args.
-  // The args of fn are now their own
-  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
-  fn: (...args: TFnArgs) => TFnReturn;
-  genKey: (...args: TFnArgs) => string;
-};
-
-const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
-  cacheableFnNode: cacheableFnNode2<T, K, J>,
-) => cacheableFnNode;
-
-const myCacheableFuncNode2 = makeCacheableFnNode2({
-  invalidatorFns: exampleCacheables,
-  // this only works with the annotation
-  getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
-    return { getDoubleAge: [5], getName: ["jaw", "knee"] };
-  },
-  fn: (id) => {
-    console.log("idk do something");
-  },
-  genKey: (id) => id.toString(),
-});
-
-// ok it sucks but for now we need the type annotation. Probs SO can help.
-// Moving on, this describes the information that we need from a function node.
-// But a function node is really just the argument for the actual function!
-
-// we need to make a function that takes a function node, and implements all the fancy shit
-// - make a logic'd-up version of the
-
-// let's see if we can make a function that takes a func node and does something with it
-export const makeCacheAware = <
-  TParentFns extends cacheableObj,
-  TFnArgs extends unknown[],
-  TFnReturn,
->(
-  funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
-  cache: cacheInterface,
-) => {
-  // takes the same args as the regular function, but also gets args for
-  // the parent fns
-  const gussiedUp = async (...args: TFnArgs) => {
-    // check for a cache hit using the primary genKey
-    // if cache hit, return hit
-    console.log("***");
-    console.log("gussied up");
-    const cacheKey = funcNode.genKey(...args);
-    console.log(`cacheKey --> ${cacheKey}`);
-    const cachedValue = await cache.get(cacheKey);
-    if (cachedValue) {
-      console.log("cache hit! Value is");
-      console.log(JSON.parse(cachedValue));
-      // uh I guess assume that the cache contains the same type that the function returns.
-      return JSON.parse(cachedValue) as TFnReturn;
-    }
-    console.log("cache miss!");
-
-    // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
-    // TEMP skip the parent stuff, and just try to cache it
-    const value = funcNode.fn(...args);
-    console.log("setting new value of");
-    console.log(value);
-    await cache.set({ key: cacheKey, value: JSON.stringify(value) });
-
-    // ok let's also see if we can generate the setKeys for each of the invalidators
-    const invalidatorArgs = funcNode.getInvalidatorArgs(...args);
-    // for each key in invalidatorArgs, call that function with its args
-    for (const functionName of Object.keys(invalidatorArgs)) {
-      // generate the using the function's genKey and the generated args
-      const setKey = funcNode.invalidatorFns[functionName].genSetKey(
-        ...invalidatorArgs[functionName],
-      );
-      console.log("set key for " + functionName);
-      console.log(setKey);
-      // add the primary cache key as a value under this setKey
-      await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
-    }
-
-    return value;
-
-    // key into the function. Set the key
-    // console.log("hey bb I am gussied up");
-    // await cache.set({ key: "gussied", value: "UP" });
-
-    // const parentArgs = funcNode.getInvalidatorArgs(...args);
-    // return parentArgs;
-  };
-  return { gussiedUp };
-};
 
 // optimization: it'd be cool if the gussiedUp function had another argument, which was an partial of the
 // parent args. When you call getParentArgs, it only gets the args that haven't been provided.
