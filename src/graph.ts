@@ -55,11 +55,11 @@ type cacheableObj = {
   [key: string]: invalidatorFn;
 };
 
-// difference between funcs and cacheables is that while the functions can be anything,
-// the cacheable for fn needs to get its args from parentFns
+// maps cacheables to their genSetKey arg types
 export type cacheableFnArg<T extends cacheableObj> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>;
 };
+
 const exampleCacheables = {
   getName: {
     fn: (name: string, lastName: string) => name,
@@ -80,9 +80,9 @@ type cacheableFnNode2<
   invalidatorFns: TInvalidatorFns;
   // instead of providing the args, it needs to return the args.
   // The args of fn are now their own
-  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
   fn: (...args: TFnArgs) => TFnReturn;
   genKey: (...args: TFnArgs) => string;
+  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
 };
 
 const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
@@ -125,8 +125,8 @@ export const makeCacheAware = <
   const gussiedUp = async (...args: TFnArgs) => {
     // check for a cache hit using the primary genKey
     // if cache hit, return hit
-    console.log("***");
-    console.log("gussied up");
+    console.log("");
+    console.log("*** gussied up ***");
     const cacheKey = funcNode.genKey(...args);
     console.log(`cacheKey --> ${cacheKey}`);
     const cachedValue = await cache.get(cacheKey);
@@ -140,8 +140,8 @@ export const makeCacheAware = <
 
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
     // TEMP skip the parent stuff, and just try to cache it
-    const value = funcNode.fn(...args);
-    console.log("setting new value of");
+    const value = await funcNode.fn(...args);
+    console.log("setting new value of:");
     console.log(value);
     await cache.set({ key: cacheKey, value: JSON.stringify(value) });
 
@@ -153,7 +153,7 @@ export const makeCacheAware = <
       const setKey = funcNode.invalidatorFns[functionName].genSetKey(
         ...invalidatorArgs[functionName],
       );
-      console.log("set key for " + functionName);
+      console.log(`setKey --> ${setKey}`);
       console.log(setKey);
       // add the primary cache key as a value under this setKey
       await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
@@ -170,6 +170,8 @@ export const makeCacheAware = <
   const invalidatorFns = Object.fromEntries(
     Object.entries(funcNode.invalidatorFns).map(([fnName, invalidatorFn]) => {
       const wrappedInvalidator = async (...args: Parameters<typeof invalidatorFn.fn>) => {
+        console.log("");
+        console.log(`*** invalidator for ${fnName} ***`);
         // 1. Generate the setKey for the invalidator function
         const setKey = invalidatorFn.genSetKey(...args);
 
@@ -213,7 +215,18 @@ export const makeCacheAware = <
 //    it kinda freaks out when I say "btw gussiedUp is the exact same as funcNode.fn", cause
 //    TS hits me with some BS like 'TFnReturn' could be instantiated with an arbitrary type which could be unrelated to 'Promise<TFnReturn>'.ts
 //    which I think is just cause it doesn't know that TFnReturn is a Promise. Which I guess makes sense idk. It doesn't really
-//    make sense for it to be sync anyway.
+//    make sense for it to be sync anyway
+// 3. Each invalidator function can have multiple ways that it invalidates something.
+//    For instance, an updateName function could invalidate the profile of the user,
+//    OR it could invalidate the profiles of all users who have them as a best friend.
+//    I guess that means youd need invalidator function to be able to handle multiple genSetKeys??
+// 4. Aw fuck... even if you have different KINDS of setKeys, a single kind could need to be run
+//    multiple times. Like if you update your bio, you need an invalidation set for
+//      - your own profile (via vanilla getInvalidationArgs)
+//      - friend #1's profile AND friend #2's profile (via a different getInvalidationArgs)
+//    What does that... mean? I guess that
+//      - genSetKey really needs to be genSetKeys array
+//      - EACH genSetKey might need to be called multiple times by getInvalidationArgs... hm...
 
 // const myCacheableFuncNode = makeCacheableFnNode({
 //   parentFns: exampleCacheables,
