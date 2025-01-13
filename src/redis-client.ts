@@ -12,6 +12,12 @@ export const redisClient: cacheInterface = {
   async set({ key, value }: { key: string; value: string }) {
     return await client.set(key, value);
   },
+  async smembers(key: string) {
+    return await client.sMembers(key);
+  },
+  async del(key: string) {
+    return await client.del(key);
+  },
   async get(key: string) {
     return await client.get(key);
   },

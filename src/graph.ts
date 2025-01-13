@@ -116,7 +116,10 @@ export const makeCacheAware = <
 >(
   funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
   cache: cacheInterface,
-): { gussiedUp: typeof funcNode.fn } => {
+): {
+  gussiedUp: (...args: TFnArgs) => Promise<TFnReturn>;
+  invalidatorFns: { [K in keyof TParentFns]: TParentFns[K]["fn"] };
+} => {
   // takes the same args as the regular function, but also gets args for
   // the parent fns
   const gussiedUp = async (...args: TFnArgs) => {
@@ -164,10 +167,53 @@ export const makeCacheAware = <
   // - takes the same args as the fn
   // - generates a setKey using the args
   // - deletes every entry via the set keys, and the set itself
-  // ugh idk maybe it has the same keys as
+  const invalidatorFns = Object.fromEntries(
+    Object.entries(funcNode.invalidatorFns).map(([fnName, invalidatorFn]) => {
+      const wrappedInvalidator = async (...args: Parameters<typeof invalidatorFn.fn>) => {
+        // 1. Generate the setKey for the invalidator function
+        const setKey = invalidatorFn.genSetKey(...args);
 
-  return { gussiedUp };
+        console.log(`Invalidating cache entries for setKey: ${setKey}`);
+
+        // 2. Retrieve all associated cache keys for this setKey
+        const cacheKeys = await cache.smembers(`invset-${setKey}`);
+        console.log(
+          `Found ${cacheKeys.length} associated cache keys: ${cacheKeys.join(", ")}`,
+        );
+
+        // 3. Delete all cache keys associated with this setKey
+        for (const key of cacheKeys) {
+          console.log(`Deleting cache key: ${key}`);
+          await cache.del(key);
+        }
+
+        // 4. Remove the invalidation set itself
+        await cache.del(`invset-${setKey}`);
+        console.log(`Deleted invalidation set: invset-${setKey}`);
+
+        // 5. Optionally call the original invalidator function
+        if (invalidatorFn.fn) {
+          console.log(`Executing original invalidator function: ${fnName}`);
+          return invalidatorFn.fn(...args);
+        }
+
+        return;
+      };
+
+      return [fnName, wrappedInvalidator];
+    }),
+  ) as unknown as { [K in keyof TParentFns]: TParentFns[K]["fn"] };
+
+  return { gussiedUp, invalidatorFns };
 };
+
+// CONFUSION
+// 1. is there a way around specifying the annotation?
+// 2. I probably need to tell makeCacheAware that the primary function is async. Otherwise
+//    it kinda freaks out when I say "btw gussiedUp is the exact same as funcNode.fn", cause
+//    TS hits me with some BS like 'TFnReturn' could be instantiated with an arbitrary type which could be unrelated to 'Promise<TFnReturn>'.ts
+//    which I think is just cause it doesn't know that TFnReturn is a Promise. Which I guess makes sense idk. It doesn't really
+//    make sense for it to be sync anyway.
 
 // const myCacheableFuncNode = makeCacheableFnNode({
 //   parentFns: exampleCacheables,

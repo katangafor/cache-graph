@@ -17,18 +17,28 @@ const main = async () => {
   await redisClient.connect();
   await redisClient.clear();
 
+  // await redisClient.sadd({ set: "maddie-stuff", value: "art" });
+  // await redisClient.sadd({ set: "maddie-stuff", value: "ok" });
+  // const mySet = await redisClient.sadd({ set: "maddie-stuff", value: "climbing" });
+  // console.log("mySet is");
+  // console.log(mySet);
+
+  // const setStuff = await redisClient.smembers("maddie-stuff");
+  // console.log("set stuff");
+  // console.log(setStuff);
+
   const exampleCacheables = {
     getName: {
-      fn: (name: string, lastName: string) => name,
+      fn: async (name: string, lastName: string) => name,
       genSetKey: (name: string, lastName: string) => `name-${name}-${lastName}`,
     },
     getDoubleAge: {
-      fn: (age: number, multiplier: number) => age * 2,
+      fn: async (age: number, multiplier: number) => age * 2,
       genSetKey: (age: number, multiplier: number) => `age-${age}-${multiplier}`,
     },
   };
 
-  const { gussiedUp } = makeCacheAware(
+  const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
       invalidatorFns: exampleCacheables,
       // this only works with the annotation :(
@@ -49,6 +59,10 @@ const main = async () => {
   await gussiedUp(10);
   await gussiedUp(10);
   await gussiedUp(10);
+
+  // now let's call an invalidator fn
+  await invalidatorFns.getDoubleAge(4, 10);
+  await invalidatorFns.getDoubleAge(5, 3);
 };
 
 main();
