@@ -46,6 +46,8 @@ export const genCachify = <TArgs extends unknown[], TReturn>({
   };
 };
 
+// this SHOULD be generic to make sure genSetKey takes the same args,
+// but that's breaking my brain and is not what I'm after right now!
 type invalidator = {
   fn: (...args: any) => any;
   genSetKey: (...args: any) => string;
@@ -55,20 +57,9 @@ type invalidatorObj = {
   [key: string]: invalidator;
 };
 
-// maps cacheables to their genSetKey arg types
+// maps invalidators to their genSetKey arg types
 export type invalidatorFnArgs<T extends invalidatorObj> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>;
-};
-
-const exampleCacheables = {
-  getName: {
-    fn: (name: string, lastName: string) => name,
-    genSetKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
-  },
-  getDoubleAge: {
-    fn: (age: number, multiplier: number) => age * 2,
-    genSetKey: (age: number) => `age:${age}`,
-  },
 };
 
 type cacheableFunctionNode<
@@ -76,8 +67,8 @@ type cacheableFunctionNode<
   TFnArgs extends unknown[],
   TFnReturn,
 > = {
+  primaryFn: (...args: TFnArgs) => TFnReturn;
   invalidatorFns: TInvalidatorFns;
-  fn: (...args: TFnArgs) => TFnReturn;
   genKey: (...args: TFnArgs) => string;
   getInvalidatorArgs: (...args: TFnArgs) => invalidatorFnArgs<TInvalidatorFns>;
 };
@@ -86,15 +77,35 @@ const makeCacheableFunctionNode = <T extends invalidatorObj, K extends unknown[]
   cacheableFnNode: cacheableFunctionNode<T, K, J>,
 ) => cacheableFnNode;
 
+const getUserProfile = (id: number) => {
+  // gets a stringified user profile or something, which includes their
+  // name and age
+};
+
+// these examples don't make much sense in context, but they illustrate the problem well
+const exampleInvalidators = {
+  updateName: {
+    fn: (name: string, lastName: string) => {
+      // update the username
+    },
+    genSetKey: (name: string, lastName: string) => `name:${name}:${lastName}`,
+  },
+  updateAge: {
+    fn: (age: number, multiplier: number) => {
+      // update the user age
+    },
+    genSetKey: (age: number) => `age:${age}`,
+  },
+};
+
 const myCacheableFunctionNode = makeCacheableFunctionNode({
-  invalidatorFns: exampleCacheables,
+  primaryFn: getUserProfile,
+  invalidatorFns: exampleInvalidators,
   // this only works with the annotation
-  getInvalidatorArgs: (id: number): invalidatorFnArgs<typeof exampleCacheables> => {
-    return { getDoubleAge: [5], getName: ["jaw", "knee"] };
+  getInvalidatorArgs: (id): invalidatorFnArgs<typeof exampleInvalidators> => {
+    return { updateName: ["jaw", "knee"], updateAge: [5] };
   },
-  fn: (id) => {
-    console.log("idk do something");
-  },
+
   genKey: (id) => id.toString(),
 });
 
@@ -137,7 +148,7 @@ export const makeCacheAware = <
 
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
     // TEMP skip the parent stuff, and just try to cache it
-    const value = await funcNode.fn(...args);
+    const value = await funcNode.primaryFn(...args);
     console.log("setting new value of:");
     console.log(value);
     await cache.set({ key: cacheKey, value: JSON.stringify(value) });

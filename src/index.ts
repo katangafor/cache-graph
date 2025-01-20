@@ -36,7 +36,7 @@ const numberyExample = async () => {
       getInvalidatorArgs: (id: number): invalidatorFnArgs<typeof exampleInvalidators> => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
-      fn: (id) => {
+      primaryFn: (id) => {
         return randInt();
       },
       genKey: (id) => `gussiedUpKey-${id.toString()}`,
@@ -77,7 +77,7 @@ const syncDoomExample = async () => {
 
   const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
-      fn: getStringifiedUser,
+      primaryFn: getStringifiedUser,
       genKey: (id) => `user-${id}`,
       invalidatorFns: profileInvalidators,
       getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
@@ -161,7 +161,7 @@ const smartModeDoomExample = async () => {
 
   const { gussiedUp: cacheAwareGetStringifiedUser, invalidatorFns } = makeCacheAware(
     {
-      fn: getStringifiedUser,
+      primaryFn: getStringifiedUser,
       genKey: (id) => `userProfile-${id}`,
       invalidatorFns: profileInvalidators,
       getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
