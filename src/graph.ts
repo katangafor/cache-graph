@@ -466,3 +466,21 @@ export const makeCacheAware = <
 // - if the function is not provided, then the genSetKey arguments themselves are always required?
 // - if you provide a function, arg to genSetKey is optional. If you provide it anyway,
 //   we can skip the built in fetcher
+
+// ok the new difficulty is:
+// there may be multiple ways that a function can invalidate a cache.
+// like updateProfileName(1) would invalidate both
+// - profile ID 1
+// - any profiles who have profile ID 1 listed as a best friend
+// I think this means that the getInvalidatorArgs function needs to return an array
+// of args for each function, and then when the gussiedUp func is executed, it passes them all
+// to the genSetKeys
+
+// how does the talk go?
+// - it's annoying to find side effects that invalidate caches
+// - those side effects are implicit dependencies of those caches
+// - let's make those implicit deps into explicit ones by providing them up front
+// - how we do that?
+//   - have some nice diagrams of sets. Like show the cache of a function is in the set
+//     of things that can be invalidated by a specific function call
+//
