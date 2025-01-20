@@ -46,17 +46,17 @@ export const genCachify = <TArgs extends unknown[], TReturn>({
   };
 };
 
-type invalidatorFn = {
+type invalidator = {
   fn: (...args: any) => any;
   genSetKey: (...args: any) => string;
 };
 
-type cacheableObj = {
-  [key: string]: invalidatorFn;
+type invalidatorObj = {
+  [key: string]: invalidator;
 };
 
 // maps cacheables to their genSetKey arg types
-export type cacheableFnArg<T extends cacheableObj> = {
+export type invalidatorFnArgs<T extends invalidatorObj> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>;
 };
 
@@ -67,32 +67,29 @@ const exampleCacheables = {
   },
   getDoubleAge: {
     fn: (age: number, multiplier: number) => age * 2,
-    // for instance, say we don't need multiplier in the cache
     genSetKey: (age: number) => `age:${age}`,
   },
 };
 
-type cacheableFnNode2<
-  TInvalidatorFns extends cacheableObj,
+type cacheableFunctionNode<
+  TInvalidatorFns extends invalidatorObj,
   TFnArgs extends unknown[],
   TFnReturn,
 > = {
   invalidatorFns: TInvalidatorFns;
-  // instead of providing the args, it needs to return the args.
-  // The args of fn are now their own
   fn: (...args: TFnArgs) => TFnReturn;
   genKey: (...args: TFnArgs) => string;
-  getInvalidatorArgs: (...args: TFnArgs) => cacheableFnArg<TInvalidatorFns>;
+  getInvalidatorArgs: (...args: TFnArgs) => invalidatorFnArgs<TInvalidatorFns>;
 };
 
-const makeCacheableFnNode2 = <T extends cacheableObj, K extends unknown[], J>(
-  cacheableFnNode: cacheableFnNode2<T, K, J>,
+const makeCacheableFunctionNode = <T extends invalidatorObj, K extends unknown[], J>(
+  cacheableFnNode: cacheableFunctionNode<T, K, J>,
 ) => cacheableFnNode;
 
-const myCacheableFuncNode2 = makeCacheableFnNode2({
+const myCacheableFunctionNode = makeCacheableFunctionNode({
   invalidatorFns: exampleCacheables,
   // this only works with the annotation
-  getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleCacheables> => {
+  getInvalidatorArgs: (id: number): invalidatorFnArgs<typeof exampleCacheables> => {
     return { getDoubleAge: [5], getName: ["jaw", "knee"] };
   },
   fn: (id) => {
@@ -110,11 +107,11 @@ const myCacheableFuncNode2 = makeCacheableFnNode2({
 
 // let's see if we can make a function that takes a func node and does something with it
 export const makeCacheAware = <
-  TParentFns extends cacheableObj,
+  TParentFns extends invalidatorObj,
   TFnArgs extends unknown[],
   TFnReturn,
 >(
-  funcNode: cacheableFnNode2<TParentFns, TFnArgs, TFnReturn>,
+  funcNode: cacheableFunctionNode<TParentFns, TFnArgs, TFnReturn>,
   cache: cacheInterface,
 ): {
   gussiedUp: (...args: TFnArgs) => Promise<TFnReturn>;

@@ -5,7 +5,7 @@
 
 // first let's see if we can make graphs work
 import { redisClient } from "./redis-client";
-import { genCachify, makeCacheAware, cacheableFnArg } from "./graph";
+import { genCachify, makeCacheAware, invalidatorFnArgs } from "./graph";
 import { getStringifiedUser, updateBio, updateName } from "../exampleApp";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
@@ -33,7 +33,7 @@ const numberyExample = async () => {
     {
       invalidatorFns: exampleInvalidators,
       // this only works with the annotation :(
-      getInvalidatorArgs: (id: number): cacheableFnArg<typeof exampleInvalidators> => {
+      getInvalidatorArgs: (id: number): invalidatorFnArgs<typeof exampleInvalidators> => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
       fn: (id) => {
@@ -80,7 +80,7 @@ const syncDoomExample = async () => {
       fn: getStringifiedUser,
       genKey: (id) => `user-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id): cacheableFnArg<typeof profileInvalidators> => {
+      getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
         return { updateName: [id, "new name"] };
       },
     },
@@ -164,7 +164,7 @@ const smartModeDoomExample = async () => {
       fn: getStringifiedUser,
       genKey: (id) => `userProfile-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id): cacheableFnArg<typeof profileInvalidators> => {
+      getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
         return { updateName: [id] };
       },
     },
