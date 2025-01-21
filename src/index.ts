@@ -5,8 +5,9 @@
 
 // first let's see if we can make graphs work
 import { redisClient } from "./redis-client";
-import { genCachify, makeCacheAware, invalidatorFnArgs } from "./graph";
+import { makeCacheAware, invalidatorFnArgs } from "./graph";
 import { getStringifiedUser, updateBio, updateName } from "../exampleApp";
+import { genCachify } from "./genCachify";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
