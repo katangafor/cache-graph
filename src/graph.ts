@@ -73,7 +73,11 @@ type cacheableFunctionNode<
   getInvalidatorArgs: (...args: TFnArgs) => invalidatorFnArgs<TInvalidatorFns>;
 };
 
-const makeCacheableFunctionNode = <T extends invalidatorObj, K extends unknown[], J>(
+const makeCacheableFunctionNode = <
+  const T extends invalidatorObj,
+  K extends unknown[],
+  J,
+>(
   cacheableFnNode: cacheableFunctionNode<T, K, J>,
 ) => cacheableFnNode;
 
@@ -102,7 +106,7 @@ const myCacheableFunctionNode = makeCacheableFunctionNode({
   primaryFn: getUserProfile,
   invalidatorFns: exampleInvalidators,
   // this only works with the annotation
-  getInvalidatorArgs: (id): invalidatorFnArgs<typeof exampleInvalidators> => {
+  getInvalidatorArgs: (id) => {
     return { updateName: ["jaw", "knee"], updateAge: [5] };
   },
 
@@ -118,7 +122,7 @@ const myCacheableFunctionNode = makeCacheableFunctionNode({
 
 // let's see if we can make a function that takes a func node and does something with it
 export const makeCacheAware = <
-  TParentFns extends invalidatorObj,
+  const TParentFns extends invalidatorObj,
   TFnArgs extends unknown[],
   TFnReturn,
 >(

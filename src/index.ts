@@ -32,8 +32,7 @@ const numberyExample = async () => {
   const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
       invalidatorFns: exampleInvalidators,
-      // this only works with the annotation :(
-      getInvalidatorArgs: (id: number): invalidatorFnArgs<typeof exampleInvalidators> => {
+      getInvalidatorArgs: (id: number) => {
         return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
       },
       primaryFn: (id) => {
@@ -80,7 +79,7 @@ const syncDoomExample = async () => {
       primaryFn: getStringifiedUser,
       genKey: (id) => `user-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
+      getInvalidatorArgs: (id) => {
         return { updateName: [id, "new name"] };
       },
     },
@@ -164,7 +163,7 @@ const smartModeDoomExample = async () => {
       primaryFn: getStringifiedUser,
       genKey: (id) => `userProfile-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id): invalidatorFnArgs<typeof profileInvalidators> => {
+      getInvalidatorArgs: (id) => {
         return { updateName: [id] };
       },
     },
