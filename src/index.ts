@@ -33,7 +33,7 @@ const numberyExample = async () => {
   const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
       invalidatorFns: exampleInvalidators,
-      getInvalidatorArgs: (id: number) => {
+      getInvalidatorArgs: async (id: number) => {
         return {
           getDoubleAge: [
             [5, 3],
@@ -86,7 +86,7 @@ const syncDoomExample = async () => {
       primaryFn: getStringifiedUser,
       genKey: (id) => `user-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id) => {
+      getInvalidatorArgs: async (id) => {
         return { updateName: [[id, "new name"]] };
       },
     },
@@ -152,10 +152,10 @@ const smartModeDoomExample = async () => {
 
   let users = [
     { id: 1, name: "doomguy", bio: "rip and tear", friends: [2, 3] },
-    { id: 2, name: "mario", bio: "it's a me", friends: [1] },
-    { id: 3, name: "link", bio: "hyah", friends: [1] },
+    { id: 2, name: "master chief", bio: "oh shit jackal snipers", friends: [1] },
+    { id: 3, name: "link", bio: "navi PLEASE shut UP", friends: [1] },
     { id: 4, name: "samus", bio: "beep boop", friends: [] },
-    { id: 5, name: "kratos", bio: "BOOYYY", friends: [3, 4] },
+    { id: 5, name: "kratos", bio: "boooyyyy", friends: [3, 4] },
   ];
 
   const profileInvalidators = {
@@ -170,8 +170,11 @@ const smartModeDoomExample = async () => {
       primaryFn: getStringifiedUser,
       genKey: (id) => `userProfile-${id}`,
       invalidatorFns: profileInvalidators,
-      getInvalidatorArgs: (id) => {
-        return { updateName: [id] };
+      getInvalidatorArgs: async (id) => {
+        const friendIds = users.filter((u) => u.friends.includes(id)).map((u) => u.id);
+        // this explicit annotation is unfortunate, but does the job
+        const friendIdArgs: [number][] = friendIds.map((id) => [id]);
+        return { updateName: [[id], ...friendIdArgs] };
       },
     },
     redisClient,
@@ -187,10 +190,16 @@ const smartModeDoomExample = async () => {
   // should be from cache
   console.log("doomguyProf2 --- ", doomguyProf2);
 
+  const masterChiefProf1 = await cacheAwareGetStringifiedUser(2, users);
+  console.log("masterChiefProf1 --- ", masterChiefProf1);
+
   await invalidatorFns.updateName(1, "DOOOOM slayer", users);
   // should invalidate doomguy's profile cache
   const doomguyProf3 = await cacheAwareGetStringifiedUser(1, users);
   console.log("doomguyProf3 --- ", doomguyProf3);
+  // the master chief cache should have been invalidated when updating doomguy's name
+  const masterChiefProf2 = await cacheAwareGetStringifiedUser(2, users);
+  console.log("masterChiefProf2 --- ", masterChiefProf2);
 };
 
 // numberyExample();
