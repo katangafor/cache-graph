@@ -34,7 +34,13 @@ const numberyExample = async () => {
     {
       invalidatorFns: exampleInvalidators,
       getInvalidatorArgs: (id: number) => {
-        return { getDoubleAge: [5, 3], getName: ["jaw", "knee"] };
+        return {
+          getDoubleAge: [
+            [5, 3],
+            [9, 8],
+          ],
+          getName: ["jaw", "knee"],
+        };
       },
       primaryFn: (id) => {
         return randInt();
@@ -81,7 +87,7 @@ const syncDoomExample = async () => {
       genKey: (id) => `user-${id}`,
       invalidatorFns: profileInvalidators,
       getInvalidatorArgs: (id) => {
-        return { updateName: [id, "new name"] };
+        return { updateName: [[id, "new name"]] };
       },
     },
     redisClient,

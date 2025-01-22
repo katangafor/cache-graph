@@ -13,7 +13,7 @@ type invalidatorObj = {
 
 // maps invalidators to their genSetKey arg types
 export type invalidatorFnArgs<T extends invalidatorObj> = {
-  [K in keyof T]: Parameters<T[K]["genSetKey"]>;
+  [K in keyof T]: Parameters<T[K]["genSetKey"]>[] | Parameters<T[K]["genSetKey"]>;
 };
 
 type cacheableFunctionNode<
