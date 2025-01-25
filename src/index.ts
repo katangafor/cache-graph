@@ -10,6 +10,60 @@ import { getStringifiedUser, updateBio, updateName } from "../exampleApp";
 import { genCachify } from "./genCachify";
 import { prisma } from "./prismaClient";
 
+const getUsers = async () => {
+  return await prisma.user.findMany();
+};
+
+const updateUserBio = async ({ id, bio }: { id: number; bio: string }) => {
+  return await prisma.user.update({
+    where: {
+      id,
+    },
+    data: {
+      bio,
+    },
+  });
+};
+
+const updateUserName = async ({ id, name }: { id: number; name: string }) => {
+  return await prisma.user.update({
+    where: {
+      id,
+    },
+    data: {
+      name,
+    },
+  });
+};
+
+const getUserProfile = async (id: number) => {
+  const user = await prisma.user.findFirstOrThrow({
+    where: {
+      id,
+    },
+  });
+
+  const userFriendRelationship = await prisma.friend_relationship.findMany({
+    where: {
+      userId: id,
+    },
+  });
+
+  const idsOfUserFriends = userFriendRelationship.map((r) => r.friendId);
+
+  const userFriends = await prisma.user.findMany({
+    where: {
+      id: {
+        in: idsOfUserFriends,
+      },
+    },
+  });
+
+  const friendsString = `Friends with ${userFriends.map((f) => f.name).join(", ")}`;
+
+  return `${user.name}:\n~~ ${user.bio} ~~\n${friendsString}`;
+};
+
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
 const randInt = () => {
@@ -151,6 +205,8 @@ const smartModeDoomExample = async () => {
   const usersPrisma = await prisma.user.findMany();
   console.log("users from prisma are");
   console.log(usersPrisma);
+  const doomguyProf = await getUserProfile(1);
+  console.log(doomguyProf);
 
   await redisClient.connect();
   await redisClient.clear();
