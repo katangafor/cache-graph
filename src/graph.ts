@@ -1,51 +1,5 @@
 import { cacheInterface } from "./cacheInterface";
 
-export type withCacheArgs<TArgs extends unknown[], TReturn> = {
-  fetchFn: (...args: TArgs) => Promise<TReturn>;
-  funcArgs: TArgs;
-  genKey: (...args: TArgs) => string;
-  set: ({ key, value }: { key: string; value: string }) => Promise<any>;
-  get: (key: string) => Promise<string | null>;
-};
-
-const withCache = async <TArgs extends unknown[], TReturn>({
-  fetchFn,
-  funcArgs,
-  genKey,
-  get,
-  set,
-}: withCacheArgs<TArgs, TReturn>) => {
-  const cacheKey = genKey(...funcArgs);
-  const rawValue = await get(cacheKey);
-
-  if (rawValue) {
-    return JSON.parse(rawValue) as TReturn;
-  }
-
-  const newVal = await fetchFn(...funcArgs);
-  await set({ key: cacheKey, value: JSON.stringify(newVal) });
-  return newVal;
-};
-
-// takes get and set, return cachify
-export const genCachify = <TArgs extends unknown[], TReturn>({
-  get,
-  set,
-}: Pick<withCacheArgs<TArgs, TReturn>, "get" | "set">) => {
-  return <TArgs extends unknown[], TReturn>(
-    withCacheArgs: Omit<withCacheArgs<TArgs, TReturn>, "funcArgs" | "get" | "set">,
-  ) => {
-    return async (...funcArgs: TArgs) => {
-      return withCache({
-        ...withCacheArgs,
-        funcArgs,
-        get,
-        set,
-      });
-    };
-  };
-};
-
 // this SHOULD be generic to make sure genSetKey takes the same args,
 // but that's breaking my brain and is not what I'm after right now!
 type invalidator = {
@@ -59,7 +13,7 @@ type invalidatorObj = {
 
 // maps invalidators to their genSetKey arg types
 export type invalidatorFnArgs<T extends invalidatorObj> = {
-  [K in keyof T]: Parameters<T[K]["genSetKey"]>;
+  [K in keyof T]: Parameters<T[K]["genSetKey"]>[] | Parameters<T[K]["genSetKey"]>;
 };
 
 type cacheableFunctionNode<
@@ -70,7 +24,7 @@ type cacheableFunctionNode<
   primaryFn: (...args: TFnArgs) => TFnReturn;
   invalidatorFns: TInvalidatorFns;
   genKey: (...args: TFnArgs) => string;
-  getInvalidatorArgs: (...args: TFnArgs) => invalidatorFnArgs<TInvalidatorFns>;
+  getInvalidatorArgs: (...args: TFnArgs) => Promise<invalidatorFnArgs<TInvalidatorFns>>;
 };
 
 const makeCacheableFunctionNode = <
@@ -106,7 +60,7 @@ const myCacheableFunctionNode = makeCacheableFunctionNode({
   primaryFn: getUserProfile,
   invalidatorFns: exampleInvalidators,
   // this only works with the annotation
-  getInvalidatorArgs: (id) => {
+  getInvalidatorArgs: async (id) => {
     return { updateName: ["jaw", "knee"], updateAge: [5] };
   },
 
@@ -135,40 +89,46 @@ export const makeCacheAware = <
   // takes the same args as the regular function, but also gets args for
   // the parent fns
   const gussiedUp = async (...args: TFnArgs) => {
-    // check for a cache hit using the primary genKey
-    // if cache hit, return hit
-    console.log("");
-    console.log("*** gussied up ***");
     const cacheKey = funcNode.genKey(...args);
-    console.log(`cacheKey --> ${cacheKey}`);
+
     const cachedValue = await cache.get(cacheKey);
     if (cachedValue) {
-      console.log("cache hit! Value is");
-      console.log(JSON.parse(cachedValue));
       // uh I guess assume that the cache contains the same type that the function returns.
       return JSON.parse(cachedValue) as TFnReturn;
     }
-    console.log("cache miss!");
 
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
     // TEMP skip the parent stuff, and just try to cache it
     const value = await funcNode.primaryFn(...args);
-    console.log("setting new value of:");
-    console.log(value);
     await cache.set({ key: cacheKey, value: JSON.stringify(value) });
 
     // ok let's also see if we can generate the setKeys for each of the invalidators
-    const invalidatorArgs = funcNode.getInvalidatorArgs(...args);
+    const invalidatorArgs = await funcNode.getInvalidatorArgs(...args);
     // for each key in invalidatorArgs, call that function with its args
     for (const functionName of Object.keys(invalidatorArgs)) {
       // generate the using the function's genKey and the generated args
-      const setKey = funcNode.invalidatorFns[functionName].genSetKey(
-        ...invalidatorArgs[functionName],
-      );
-      console.log(`setKey --> ${setKey}`);
-      console.log(setKey);
-      // add the primary cache key as a value under this setKey
-      await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
+      // here's the tricky part: ...invalidatorArgs[functionName] could either be
+      // - a tuple, containing the args for one call of the function
+      // - an array of such tuples
+      // both of those are arrays, so to tell if you're dealing with an array
+      // of tuples, check to see if the first element is an array
+      if (Array.isArray(invalidatorArgs[functionName][0])) {
+        console.log(`*** invalidator for ${functionName} ***`);
+        console.log(invalidatorArgs[functionName]);
+        for (const args of invalidatorArgs[functionName]) {
+          const setKey = funcNode.invalidatorFns[functionName].genSetKey(...args);
+          // add the primary cache key as a value under this setKey
+          await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
+        }
+        continue;
+      } else {
+        const setKey = funcNode.invalidatorFns[functionName].genSetKey(
+          ...invalidatorArgs[functionName],
+        );
+        // add the primary cache key as a value under this setKey
+        await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
+      }
+      // otherwise just add it normally
     }
 
     return value;
@@ -479,6 +439,17 @@ export const makeCacheAware = <
 // - if you provide a function, arg to genSetKey is optional. If you provide it anyway,
 //   we can skip the built in fetcher
 
+// how does the talk go?
+// - it's annoying to find side effects that invalidate caches
+// - it's annoying that functions need to have caching side effects built-in
+//   - this one isn't really a big deal, but now I have two bullet points
+// - those side effects are implicit dependencies of those caches
+// - let's make those implicit deps into explicit ones by providing them up front
+// - how we do that?
+//   - have some nice diagrams of sets. Like show the cache of a function is in the set
+//     of things that can be invalidated by a specific function call
+//
+
 // ok the new difficulty is:
 // there may be multiple ways that a function can invalidate a cache.
 // like updateProfileName(1) would invalidate both
@@ -487,12 +458,3 @@ export const makeCacheAware = <
 // I think this means that the getInvalidatorArgs function needs to return an array
 // of args for each function, and then when the gussiedUp func is executed, it passes them all
 // to the genSetKeys
-
-// how does the talk go?
-// - it's annoying to find side effects that invalidate caches
-// - those side effects are implicit dependencies of those caches
-// - let's make those implicit deps into explicit ones by providing them up front
-// - how we do that?
-//   - have some nice diagrams of sets. Like show the cache of a function is in the set
-//     of things that can be invalidated by a specific function call
-//
