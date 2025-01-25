@@ -10,6 +10,50 @@ import { getStringifiedUser, updateBio, updateName } from "../exampleApp";
 import { genCachify } from "./genCachify";
 import { prisma } from "./prismaClient";
 
+/**
+ * 
+ * INSERT INTO user (id, name, bio) VALUES
+(1, 'doomguy', 'rip and tear'),
+(2, 'master chief', 'oh shit jackal snipers'),
+(3, 'link', 'navi PLEASE shut UP'),
+(4, 'samus', 'beep boop'),
+(5, 'kratos', 'boooyyyy');
+
+INSERT INTO friend_relationship (userId, friendId) VALUES
+(1, 2),
+(1, 3),
+(2, 1),
+(3, 1),
+(5, 3),
+(5, 4);
+ */
+// clear both tables and insert that data
+const resetDB = async () => {
+  await prisma.friend_relationship.deleteMany({});
+  await prisma.user.deleteMany({});
+
+  await prisma.user.createMany({
+    data: [
+      { id: 1, name: "doomguy", bio: "rip and tear" },
+      { id: 2, name: "master chief", bio: "oh shit jackal snipers" },
+      { id: 3, name: "link", bio: "navi PLEASE shut UP" },
+      { id: 4, name: "samus", bio: "beep boop" },
+      { id: 5, name: "kratos", bio: "boooyyyy" },
+    ],
+  });
+
+  await prisma.friend_relationship.createMany({
+    data: [
+      { userId: 1, friendId: 2 },
+      { userId: 1, friendId: 3 },
+      { userId: 2, friendId: 1 },
+      { userId: 3, friendId: 1 },
+      { userId: 5, friendId: 3 },
+      { userId: 5, friendId: 4 },
+    ],
+  });
+};
+
 const getUsers = async () => {
   return await prisma.user.findMany();
 };
@@ -36,6 +80,16 @@ const updateUserName = async ({ id, name }: { id: number; name: string }) => {
   });
 };
 
+const getFriendIds = async (id: number) => {
+  const userFriendRelationship = await prisma.friend_relationship.findMany({
+    where: {
+      userId: id,
+    },
+  });
+
+  return userFriendRelationship.map((r) => r.friendId);
+};
+
 const getUserProfile = async (id: number) => {
   const user = await prisma.user.findFirstOrThrow({
     where: {
@@ -43,13 +97,7 @@ const getUserProfile = async (id: number) => {
     },
   });
 
-  const userFriendRelationship = await prisma.friend_relationship.findMany({
-    where: {
-      userId: id,
-    },
-  });
-
-  const idsOfUserFriends = userFriendRelationship.map((r) => r.friendId);
+  const idsOfUserFriends = await getFriendIds(id);
 
   const userFriends = await prisma.user.findMany({
     where: {
@@ -61,7 +109,7 @@ const getUserProfile = async (id: number) => {
 
   const friendsString = `Friends with ${userFriends.map((f) => f.name).join(", ")}`;
 
-  return `${user.name}:\n~~ ${user.bio} ~~\n${friendsString}`;
+  return `\n${user.name}:\n~~ ${user.bio} ~~\n${friendsString}`;
 };
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
@@ -201,41 +249,47 @@ const cachifiedDoomExample = async () => {
   // ^ should be the same, even though we updated the name
 };
 
-const smartModeDoomExample = async () => {
-  const usersPrisma = await prisma.user.findMany();
-  console.log("users from prisma are");
-  console.log(usersPrisma);
-  const doomguyProf = await getUserProfile(1);
-  console.log(doomguyProf);
+// pick your primary fn
+// pick your invalidators
+// getInvalidatorArgs implementation
 
+const smartModeDoomExample = async () => {
   await redisClient.connect();
   await redisClient.clear();
-
-  let users = [
-    { id: 1, name: "doomguy", bio: "rip and tear", friends: [2, 3] },
-    { id: 2, name: "master chief", bio: "oh shit jackal snipers", friends: [1] },
-    { id: 3, name: "link", bio: "navi PLEASE shut UP", friends: [1] },
-    { id: 4, name: "samus", bio: "beep boop", friends: [] },
-    { id: 5, name: "kratos", bio: "boooyyyy", friends: [3, 4] },
-  ];
+  await resetDB();
 
   const profileInvalidators = {
     updateName: {
-      fn: updateName,
+      fn: updateUserName,
       genSetKey: (id: number) => `updateName-${id}`,
+    },
+    updateBio: {
+      fn: updateUserBio,
+      genSetKey: (id: number) => `updateBio-${id}`,
     },
   };
 
-  const { gussiedUp: cacheAwareGetStringifiedUser, invalidatorFns } = makeCacheAware(
+  const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
-      primaryFn: getStringifiedUser,
+      primaryFn: getUserProfile,
       genKey: (id) => `userProfile-${id}`,
       invalidatorFns: profileInvalidators,
       getInvalidatorArgs: async (id) => {
-        const friendIds = users.filter((u) => u.friends.includes(id)).map((u) => u.id);
-        // this explicit annotation is unfortunate, but does the job
+        // need args for both user, and friends of user
+        const friendIds = await getFriendIds(id);
         const friendIdArgs: [number][] = friendIds.map((id) => [id]);
-        return { updateName: [[id], ...friendIdArgs] };
+
+        const updateNameArgs: [number][] = [[id], ...friendIdArgs];
+
+        // now for updateBio: only need the primary ID, since the user's
+        // profile doesn't include friends' bios
+        const updateBioArgs: [number] = [id];
+        console.log("\nall generated invalidator args: ", {
+          updateNameArgs,
+          updateBioArgs,
+        });
+
+        return { updateName: updateNameArgs, updateBio: updateBioArgs };
       },
     },
     redisClient,
@@ -244,23 +298,25 @@ const smartModeDoomExample = async () => {
   console.log("**********");
   console.log("**********");
   console.log("**********");
-  const doomguyProf1 = await cacheAwareGetStringifiedUser(1, users);
-  console.log("doomguyProf1 --- ", doomguyProf1);
+  const doomguyProf1 = await gussiedUp(1);
+  // console.log(doomguyProf1);
 
-  const doomguyProf2 = await cacheAwareGetStringifiedUser(1, users);
-  // should be from cache
-  console.log("doomguyProf2 --- ", doomguyProf2);
+  const doomguyProf2 = await gussiedUp(1);
 
-  const masterChiefProf1 = await cacheAwareGetStringifiedUser(2, users);
-  console.log("masterChiefProf1 --- ", masterChiefProf1);
+  await invalidatorFns.updateName({ id: 1, name: "DOOOOM SLAYER" });
+  // // should be from cache
+  // console.log(doomguyProf2);
 
-  await invalidatorFns.updateName(1, "DOOOOM slayer", users);
-  // should invalidate doomguy's profile cache
-  const doomguyProf3 = await cacheAwareGetStringifiedUser(1, users);
-  console.log("doomguyProf3 --- ", doomguyProf3);
-  // the master chief cache should have been invalidated when updating doomguy's name
-  const masterChiefProf2 = await cacheAwareGetStringifiedUser(2, users);
-  console.log("masterChiefProf2 --- ", masterChiefProf2);
+  // const masterChiefProf1 = await gussiedUp(2);
+  // console.log(masterChiefProf1);
+
+  // // await invalidatorFns.updateName({ id: 1, name: "DOOOOM SLAYER" });
+  // // should invalidate doomguy's profile cache
+  // const doomguyProf3 = await gussiedUp(1);
+  // console.log(doomguyProf3);
+  // // the master chief cache should have been invalidated when updating doomguy's name
+  // const masterChiefProf2 = await gussiedUp(2);
+  // console.log(masterChiefProf2);
 };
 
 // numberyExample();
