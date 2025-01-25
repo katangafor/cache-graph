@@ -8,6 +8,7 @@ import { redisClient } from "./redis-client";
 import { makeCacheAware, invalidatorFnArgs } from "./graph";
 import { getStringifiedUser, updateBio, updateName } from "../exampleApp";
 import { genCachify } from "./genCachify";
+import { prisma } from "./prismaClient";
 
 // need to make sure I can cache stuff, then I can cache stuff with my HOF
 
@@ -147,6 +148,10 @@ const cachifiedDoomExample = async () => {
 };
 
 const smartModeDoomExample = async () => {
+  const usersPrisma = await prisma.user.findMany();
+  console.log("users from prisma are");
+  console.log(usersPrisma);
+
   await redisClient.connect();
   await redisClient.clear();
 

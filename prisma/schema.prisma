@@ -1,0 +1,25 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model user {
+  id        Int                   @id @default(autoincrement())
+  name      String
+  bio       String?
+  friends   friend_relationship[] @relation("UserFriends")
+  friendsOf friend_relationship[] @relation("FriendOfUser")
+}
+
+model friend_relationship {
+  user     user @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  userId   Int
+  friend   user @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+  friendId Int
+
+  @@id([userId, friendId])
+}
