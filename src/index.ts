@@ -69,6 +69,8 @@ const updateUserBio = async ({ id, bio }: { id: number; bio: string }) => {
   });
 };
 
+type updateBioArgs = Parameters<typeof updateUserBio>;
+
 const updateUserName = async ({ id, name }: { id: number; name: string }) => {
   return await prisma.user.update({
     where: {
@@ -79,6 +81,8 @@ const updateUserName = async ({ id, name }: { id: number; name: string }) => {
     },
   });
 };
+
+type updateNameArgs = Parameters<typeof updateUserName>;
 
 const getFriendIds = async (id: number) => {
   const userFriendRelationship = await prisma.friend_relationship.findMany({
@@ -261,12 +265,11 @@ const smartModeDoomExample = async () => {
   const profileInvalidators = {
     updateName: {
       fn: updateUserName,
-      genSetKey: (...args: Parameters<typeof updateUserName>) =>
-        `updateName-${args[0].id}`,
+      genSetKey: (...args: updateNameArgs) => `updateName-${args[0].id}`,
     },
     updateBio: {
       fn: updateUserBio,
-      genSetKey: (...args: Parameters<typeof updateUserBio>) => `updateBio-${args[0].id}`,
+      genSetKey: (...args: updateBioArgs) => `updateBio-${args[0].id}`,
     },
   };
 
@@ -279,24 +282,16 @@ const smartModeDoomExample = async () => {
       getInvalidatorArgs: async (id) => {
         // need args for both user, and friends of user
         const friendIds = await getFriendIds(id);
-        const friendIdArgs: [{ id: number; name: string }][] = friendIds.map((id) => [
+        const friendIdArgs: updateNameArgs[] = friendIds.map((id) => [
           { id, name: "pls" },
         ]);
 
         // const updateNameArgs: [{ id: number; bio: string }][] = [
-        const updateNameArgs: Parameters<
-          (typeof profileInvalidators)["updateName"]["genSetKey"]
-        >[] = [[{ id, name: "pls" }], ...friendIdArgs];
+        const updateNameArgs: updateNameArgs[] = [[{ id, name: "pls" }], ...friendIdArgs];
 
         // now for updateBio: only need the primary ID, since the user's
         // profile doesn't include friends' bios
-        const updateBioArgs: Parameters<
-          (typeof profileInvalidators)["updateBio"]["genSetKey"]
-        >[] = [[{ id, bio: "pls" }]];
-        console.log("\nall generated invalidator args: ", {
-          updateNameArgs,
-          updateBioArgs,
-        });
+        const updateBioArgs: updateBioArgs[] = [[{ id, bio: "pls" }]];
 
         return { updateName: updateNameArgs, updateBio: updateBioArgs };
       },
@@ -308,24 +303,23 @@ const smartModeDoomExample = async () => {
   console.log("**********");
   console.log("**********");
   const doomguyProf1 = await gussiedUp(1);
-  // console.log(doomguyProf1);
+  console.log("\ndoomguy 1:");
+  console.log(doomguyProf1);
 
   const doomguyProf2 = await gussiedUp(1);
+  console.log("\ndoomguy 2: should match doomguy 1 via cache hit");
+  console.log(doomguyProf2);
 
   await invalidatorFns.updateName({ id: 1, name: "DOOOOM SLAYER" });
-  // // should be from cache
-  // console.log(doomguyProf2);
 
-  // const masterChiefProf1 = await gussiedUp(2);
-  // console.log(masterChiefProf1);
+  const doomguy3 = await gussiedUp(1);
+  console.log("\ndoomguy 3: should have updated name");
+  console.log(doomguy3);
 
-  // // await invalidatorFns.updateName({ id: 1, name: "DOOOOM SLAYER" });
-  // // should invalidate doomguy's profile cache
-  // const doomguyProf3 = await gussiedUp(1);
-  // console.log(doomguyProf3);
-  // // the master chief cache should have been invalidated when updating doomguy's name
-  // const masterChiefProf2 = await gussiedUp(2);
-  // console.log(masterChiefProf2);
+  await invalidatorFns.updateName({ id: 2, name: "MASTER CHEEF" });
+  const doomguy4 = await gussiedUp(1);
+  console.log("\ndoomguy 4: should have master chief's name updated in friends list");
+  console.log(doomguy4);
 };
 
 // numberyExample();

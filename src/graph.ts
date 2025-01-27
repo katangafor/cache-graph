@@ -94,11 +94,9 @@ export const makeCacheAware = <
     const cachedValue = await cache.get(cacheKey);
     if (cachedValue) {
       // uh I guess assume that the cache contains the same type that the function returns.
-      console.log("\nCACHE HIT");
       return JSON.parse(cachedValue) as TFnReturn;
     }
 
-    console.log("\nCACHE MISS");
     // if cache miss, call getParentArgs, and then loop through parentFns, passing that paretnFn's
     // TEMP skip the parent stuff, and just try to cache it
     const value = await funcNode.primaryFn(...args);
@@ -115,8 +113,6 @@ export const makeCacheAware = <
       // both of those are arrays, so to tell if you're dealing with an array
       // of tuples, check to see if the first element is an array
       if (Array.isArray(invalidatorArgs[functionName][0])) {
-        console.log(`\ninvalidator args (multiple) for ${functionName}`);
-        console.log(invalidatorArgs[functionName]);
         for (const args of invalidatorArgs[functionName]) {
           const setKey = funcNode.invalidatorFns[functionName].genSetKey(...args);
           // add the primary cache key as a value under this setKey
@@ -124,8 +120,6 @@ export const makeCacheAware = <
         }
         continue;
       } else {
-        console.log(`\ninvalidator args (single) for ${functionName}`);
-        console.log(invalidatorArgs[functionName]);
         const setKey = funcNode.invalidatorFns[functionName].genSetKey(
           ...invalidatorArgs[functionName],
         );
@@ -146,32 +140,17 @@ export const makeCacheAware = <
   const invalidatorFns = Object.fromEntries(
     Object.entries(funcNode.invalidatorFns).map(([fnName, invalidatorFn]) => {
       const wrappedInvalidator = async (...args: Parameters<typeof invalidatorFn.fn>) => {
-        console.log("");
-        console.log(`*** invalidator for ${fnName} ***`);
-        // 1. Generate the setKey for the invalidator function
         const setKey = invalidatorFn.genSetKey(...args);
-
-        console.log(`Invalidating cache entries for setKey: ${setKey}`);
-
-        // 2. Retrieve all associated cache keys for this setKey
         const cacheKeys = await cache.smembers(`invset-${setKey}`);
-        console.log(
-          `Found ${cacheKeys.length} associated cache keys: ${cacheKeys.join(", ")}`,
-        );
-
-        // 3. Delete all cache keys associated with this setKey
         for (const key of cacheKeys) {
-          console.log(`Deleting cache key: ${key}`);
           await cache.del(key);
         }
 
         // 4. Remove the invalidation set itself
         await cache.del(`invset-${setKey}`);
-        console.log(`Deleted invalidation set: invset-${setKey}`);
 
         // 5. Optionally call the original invalidator function
         if (invalidatorFn.fn) {
-          console.log(`Executing original invalidator function: ${fnName}`);
           return invalidatorFn.fn(...args);
         }
 
