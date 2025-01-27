@@ -261,14 +261,16 @@ const smartModeDoomExample = async () => {
   const profileInvalidators = {
     updateName: {
       fn: updateUserName,
-      genSetKey: (id: number) => `updateName-${id}`,
+      genSetKey: (...args: Parameters<typeof updateUserName>) =>
+        `updateName-${args[0].id}`,
     },
     updateBio: {
       fn: updateUserBio,
-      genSetKey: (id: number) => `updateBio-${id}`,
+      genSetKey: (...args: Parameters<typeof updateUserBio>) => `updateBio-${args[0].id}`,
     },
   };
 
+  // LOL it is such a PITA to get this typed correctly
   const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
       primaryFn: getUserProfile,
@@ -277,13 +279,20 @@ const smartModeDoomExample = async () => {
       getInvalidatorArgs: async (id) => {
         // need args for both user, and friends of user
         const friendIds = await getFriendIds(id);
-        const friendIdArgs: [number][] = friendIds.map((id) => [id]);
+        const friendIdArgs: [{ id: number; name: string }][] = friendIds.map((id) => [
+          { id, name: "pls" },
+        ]);
 
-        const updateNameArgs: [number][] = [[id], ...friendIdArgs];
+        // const updateNameArgs: [{ id: number; bio: string }][] = [
+        const updateNameArgs: Parameters<
+          (typeof profileInvalidators)["updateName"]["genSetKey"]
+        >[] = [[{ id, name: "pls" }], ...friendIdArgs];
 
         // now for updateBio: only need the primary ID, since the user's
         // profile doesn't include friends' bios
-        const updateBioArgs: [number] = [id];
+        const updateBioArgs: Parameters<
+          (typeof profileInvalidators)["updateBio"]["genSetKey"]
+        >[] = [[{ id, bio: "pls" }]];
         console.log("\nall generated invalidator args: ", {
           updateNameArgs,
           updateBioArgs,

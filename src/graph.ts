@@ -462,3 +462,19 @@ export const makeCacheAware = <
 // I think this means that the getInvalidatorArgs function needs to return an array
 // of args for each function, and then when the gussiedUp func is executed, it passes them all
 // to the genSetKeys
+
+// ok the NEWEST difficulty is:
+// - it is a huge pain in the ass to type the arguments correctly in getInvalidatorArgs.
+//   You constantly have to reassure typescript that you're passing the right type. It's p
+//   unwieldy.
+// - The type of genSetKey NEEDS to be tied to fn. The actual implementation assumes
+//   they are the same, but you can do whatever you want with genSetKey and nobody
+//   freaks out.
+// - What's the deal with genSetKey args? Like you don't need ALL of the fn args to
+//   make a set key. So maybe genSetKey args shouldn't be a direct copy, but a partial
+//   subset. Like if fn takes (id, { bio: string }) genSetKey should be able to provide
+//   (id?, { bio?: string }). That's hard though cause you can't just make tuple items
+//   optional. Maybe I could union them all with undefined? and throw Partial on a param
+//   if it's an object?
+// - Maybe I need a different structure. Like maybe each invalidator shoul provide it's
+//   own way to get it's args from the parent fn args.
