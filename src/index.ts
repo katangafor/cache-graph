@@ -257,6 +257,9 @@ const cachifiedDoomExample = async () => {
 // pick your invalidators
 // getInvalidatorArgs implementation
 
+// ************************
+// ******* WOO WOO ********
+// ************************
 const smartModeDoomExample = async () => {
   await redisClient.connect();
   await redisClient.clear();
@@ -291,7 +294,7 @@ const smartModeDoomExample = async () => {
 
         // now for updateBio: only need the primary ID, since the user's
         // profile doesn't include friends' bios
-        const updateBioArgs: updateBioArgs[] = [[{ id, bio: "pls" }]];
+        const updateBioArgs: updateBioArgs = [{ id, bio: "pls" }];
 
         return { updateName: updateNameArgs, updateBio: updateBioArgs };
       },
