@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch ./src/index.ts"
+    "dev": "tsx watch ./src/index.ts",
+    "morph": "tsx watch ./src/morph.ts"
   },
   "author": "",
   "license": "ISC",
@@ -16,6 +17,7 @@
     "typescript": "^5.7.3"
   },
   "devDependencies": {
-    "prisma": "^6.2.1"
+    "prisma": "^6.2.1",
+    "ts-morph": "^25.0.0"
   }
 }
