@@ -1,11 +1,4 @@
-import { Project, ts } from "ts-morph";
-import axios from "axios";
-
-// make a lil axios client to test hittin httpbin 
-const axiosClient = axios.create({
-  baseURL: "https://httpbin.org",
-});
-
+import { CallExpression, Project, ts } from "ts-morph";
 
 const project = new Project({
   tsConfigFilePath: "./tsconfig.json",
@@ -13,10 +6,18 @@ const project = new Project({
 
 const file = project.getSourceFileOrThrow("src/morphMe.ts");
 
-console.log("gonna do it")
-
-file.getDescendantsOfKind(ts.SyntaxKind.Identifier).forEach((id) => {
-  if (id.getType().getText() === "user") {
-    console.log(`${id.getText()} on line ${id.getStartLineNumber()}`);
+file.getDescendantsOfKind(ts.SyntaxKind.CallExpression).forEach((cexp) => {
+  console.log("\n***")
+  const symbol = cexp.getReturnType().getSymbol()
+  if (!symbol || symbol.getName() !== "Promise") {
+    return false;
   }
+  console.log("Found a Promise-returning call expression:")
+  console.log(cexp.getText())
+  const typeArgs = cexp.getTypeArguments()
+  console.log("Type arguments:")
+  console.log(typeArgs.map((arg) => arg.getText()))
+
 })
+
+//
