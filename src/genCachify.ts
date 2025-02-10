@@ -25,20 +25,18 @@ const withCache = async <TArgs extends unknown[], TReturn>({
   return newVal;
 };
 
-// takes get and set, return cachify
-export const genCachify = <TArgs extends unknown[], TReturn>({
-  get,
-  set,
-}: Pick<withCacheArgs<TArgs, TReturn>, "get" | "set">) => {
+export const genCachify = <TArgs extends unknown[], TReturn>(
+  outerArgs: Pick<withCacheArgs<TArgs, TReturn>, "get" | "set">,
+) => {
   return <TArgs extends unknown[], TReturn>(
-    withCacheArgs: Omit<withCacheArgs<TArgs, TReturn>, "funcArgs" | "get" | "set">,
+    innerArgs: Pick<withCacheArgs<TArgs, TReturn>, "fetchFn" | "genKey">,
   ) => {
     return async (...funcArgs: TArgs) => {
+      //
       return withCache({
-        ...withCacheArgs,
+        ...innerArgs,
+        ...outerArgs,
         funcArgs,
-        get,
-        set,
       });
     };
   };
