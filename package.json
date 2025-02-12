@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch ./src/index.ts",
     "morph": "tsx ./src/morph.ts",
-    "morphMe": "tsx ./src/morphMe.ts"
+    "morphMe": "tsx ./src/morphMe.ts",
+    "addSchemas": "tsx ./src/addSchemas.ts"
   },
   "author": "",
   "license": "ISC",
