@@ -39,11 +39,11 @@ fetchNonsense()
     console.log(e);
   });
 
-// const axiosClient = axios.create({
-//   baseURL: "https://httpbin.org",
-// });
+const axiosClient = axios.create({
+  baseURL: "https://httpbin.org",
+});
 // ok now make the call
-// const gimmeThat = () => axiosClient.get("/get")
+const gimmeThat = () => axiosClient.get("/get")
 
 // const doSomething = async () => {
 //   const response = gimmeThat();
