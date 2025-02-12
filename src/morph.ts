@@ -5,6 +5,7 @@ import {
   SourceFile,
   PropertyAccessExpression,
 } from "ts-morph";
+import * as path from "path"
 
 const project = new Project({
   // tsConfigFilePath: "./tsconfig.json",
@@ -66,6 +67,37 @@ const schemifyFileFetch = (file: SourceFile) => {
 // want to find:
 // a call expression where the getExpression.getExpression is of type AxiosInstance
 
+const getRelativeImportPath = (sourceFile: SourceFile, targetPath: string) => {
+  const sourceDir = path.dirname(sourceFile.getFilePath());
+  let relativePath = path.relative(sourceDir, targetPath);
+
+  // Ensure it starts with './' or '../'
+  if (!relativePath.startsWith(".")) {
+    relativePath = "./" + relativePath;
+  }
+
+  // Remove file extension for TypeScript import (if it's a .ts file)
+  relativePath = relativePath.replace(/\.ts$/, "");
+
+  return relativePath;
+};
+
+const ensureSchemerImport = (file: SourceFile, schemerPath: string) => {
+  const importDeclarations = file.getImportDeclarations();
+  const isAlreadyImported = importDeclarations.some((imp) =>
+    imp.getModuleSpecifierValue().includes("mySchemer")
+  );
+
+  if (!isAlreadyImported) {
+    const relativePath = getRelativeImportPath(file, schemerPath);
+    file.addImportDeclaration({
+      namedImports: ["mySchemer"],
+      moduleSpecifier: relativePath,
+    });
+  }
+};
+
+
 type callInstance = {
   line: number;
   filePath: string;
@@ -116,11 +148,16 @@ const getAxiosCalls = (file: SourceFile) => {
   return instances;
 };
 
+const schemerFilePath = "/Users/jhanetheknotww.com/ive/src/schemerify.ts";
+
 const wrapAxiosCall = ({ callExpression, argsText, expText, filePath, line}: callInstance) => {
+
+  const file = callExpression.getSourceFile();
+  ensureSchemerImport(file, schemerFilePath);
   callExpression.replaceWithText(`
     mySchemer({
       fn: ${expText},
-      tag: "${filePath}_${line}"
+      tag: "${filePath.split("/").pop()}:${expText}:${line}"
     })(${argsText})
     `)
 }
@@ -140,7 +177,7 @@ let instances: callInstance[] = [];
 for (const file of [gpAxiosFile]) {
   instances = [...instances, ...getAxiosCalls(file)];
 }
-const myInstance = instances[1]
+const myInstance = instances[0]
 console.log(myInstance);
 // console.log(instances.length + " instances");
 
