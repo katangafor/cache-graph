@@ -1,10 +1,4 @@
-import {
-  CallExpression,
-  Project,
-  ts,
-  SourceFile,
-  PropertyAccessExpression,
-} from "ts-morph";
+import { CallExpression, Project, ts, SourceFile } from "ts-morph";
 
 const project = new Project({
   tsConfigFilePath: "/Users/jhanetheknotww.com/ive/tsconfig.json",
@@ -45,12 +39,6 @@ const ensureZodImport = (file: SourceFile, schemerPath: string) => {
   }
 };
 
-// given a tag, hit a request like this curl
-// curl --location 'http://localhost:3009/generate-schema' \
-// --header 'Content-Type: application/json' \
-// --data '{
-//     "tag": "getCompletion"
-// }'
 const getSchema = async (tag: string) => {
   const response = await fetch("http://localhost:3009/generate-schema", {
     method: "POST",
@@ -69,39 +57,42 @@ const getSchema = async (tag: string) => {
   return schemaString;
 };
 
+const addSchemaToSchemerCall = async (cexp: CallExpression) => {
+  const tag = cexp.getArguments()[1].getText().slice(1, -1);
+  const schema = await getSchema(tag);
+  if (schema === null) {
+    return null;
+  }
+
+  const sourceFile = cexp.getSourceFile();
+  ensureZodImport(sourceFile, "zod");
+  const schemaVarName = "schema_line_" + cexp.getStartLineNumber();
+  sourceFile.addVariableStatement({
+    declarations: [
+      {
+        name: schemaVarName,
+        initializer: schema,
+      },
+    ],
+  });
+
+  // add new const to file: the zod schema
+
+  // add a third argument to the call
+  const currentArgs = cexp.getArguments().map((arg) => arg.getText());
+  const newArgs = [...currentArgs, schemaVarName];
+  const parentExpr = cexp.getExpression().getText();
+  // print the file and line number
+  console.log(`${cexp.getSourceFile().getFilePath()}:${cexp.getStartLineNumber()}`);
+
+  cexp.replaceWithText(`${parentExpr}(${newArgs.join(", ")})`);
+};
+
 const main = async () => {
   const calls = getSchemerCalls();
   console.log(calls.length + " calls found");
   for (const cexp of calls) {
-    // slice off the quotes
-    const tag = cexp.getArguments()[1].getText().slice(1, -1);
-    const schema = await getSchema(tag);
-    if (schema === null) {
-      continue;
-    }
-
-    const sourceFile = cexp.getSourceFile();
-    ensureZodImport(sourceFile, "zod");
-    const schemaVarName = "schema_line_" + cexp.getStartLineNumber();
-    sourceFile.addVariableStatement({
-      declarations: [
-        {
-          name: schemaVarName,
-          initializer: schema,
-        },
-      ],
-    });
-
-    // add new const to file: the zod schema
-
-    // add a third argument to the call
-    const currentArgs = cexp.getArguments().map((arg) => arg.getText());
-    const newArgs = [...currentArgs, schemaVarName];
-    const parentExpr = cexp.getExpression().getText();
-    // print the file and line number
-    console.log(`${cexp.getSourceFile().getFilePath()}:${cexp.getStartLineNumber()}`);
-
-    cexp.replaceWithText(`${parentExpr}(${newArgs.join(", ")})`);
+    await addSchemaToSchemerCall(cexp);
   }
 
   project.saveSync();
