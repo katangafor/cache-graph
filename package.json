@@ -5,12 +5,15 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch ./src/index.ts",
-    "morph": "tsx ./src/morph.ts"
+    "morph": "tsx ./src/morph.ts",
+    "morphMe": "tsx ./src/morphMe.ts",
+    "addSchemas": "tsx ./src/addSchemas.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "@types/node": "^22.13.1",
     "axios": "^1.7.9",
     "prettier": "^3.4.2",
     "redis": "^4.7.0",
