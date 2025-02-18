@@ -2,19 +2,42 @@ import { cacheInterface } from "./cacheInterface";
 
 // this SHOULD be generic to make sure genSetKey takes the same args,
 // but that's breaking my brain and is not what I'm after right now!
-type invalidator = {
-  fn: (...args: any) => any;
-  genSetKey: (...args: any) => string;
+type invalidator<TArgs extends unknown[]> = {
+  fn: (...args: TArgs) => any;
+  genSetKey: (...args: TArgs) => string;
 };
 
-type invalidatorObj = {
-  [key: string]: invalidator;
+type invalidatorObj<T extends Record<string, { fn: (...args: any) => any }>> = {
+  [K in keyof T]: invalidator<Parameters<T[K]["fn"]>>;
 };
 
 // maps invalidators to their genSetKey arg types
-export type invalidatorFnArgs<T extends invalidatorObj> = {
+export type invalidatorFnArgs<T extends invalidatorObj<any>> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>[] | Parameters<T[K]["genSetKey"]>;
 };
+
+// just a dummy function to be able to try different args and make sure
+// TS can infer the invalidators correctly
+const makeInvalidatorObj = <T extends Record<string, { fn: (...args: any) => any }>>(
+  invalidators: invalidatorObj<T>,
+) => invalidators;
+
+const myAppleInvalidatorObj = makeInvalidatorObj({
+  updateName: {
+    fn: (name: string) => {
+      // update the name
+    },
+    genSetKey: (name: string) => `name:${name}`,
+  },
+  updateAge: {
+    fn: (age: number) => {
+      // update the age
+    },
+    genSetKey: (age: number) => `age:${age}`,
+  },
+});
+
+const myThing = makeInvaliad;
 
 type cacheableFunctionNode<
   TInvalidatorFns extends invalidatorObj,
