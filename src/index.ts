@@ -139,14 +139,23 @@ const numberyExample = async () => {
 
   const { gussiedUp, invalidatorFns } = makeCacheAware(
     {
-      invalidatorFns: exampleInvalidators,
+      invalidatorFns: {
+        getName: {
+          fn: async (name: string, lastName: string) => name,
+          genSetKey: (name: string) => `name-${name}`,
+        },
+        getDoubleAge: {
+          fn: async (age: number, multiplier: number) => age * 2,
+          genSetKey: (age: number, multiplier: number) => `age-${age}-${multiplier}`,
+        },
+      },
       getInvalidatorArgs: async (id: number) => {
         return {
           getDoubleAge: [
             [5, 3],
             [9, 8],
           ],
-          getName: ["jaw", "knee"],
+          getName: ["jaw"],
         };
       },
       primaryFn: (id) => {

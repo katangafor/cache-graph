@@ -1,46 +1,44 @@
 import { cacheInterface } from "./cacheInterface";
 
-// this SHOULD be generic to make sure genSetKey takes the same args,
-// but that's breaking my brain and is not what I'm after right now!
-type invalidator<TArgs extends unknown[]> = {
-  fn: (...args: TArgs) => any;
-  genSetKey: (...args: TArgs) => string;
+type invalidatorObj<T> = {
+  [K in keyof T]: T[K] extends {
+    fn: (...args: infer A) => unknown;
+    genSetKey: (...args: infer B) => string;
+  }
+    ? B extends A
+      ? T[K]
+      : never
+    : never;
 };
 
-type invalidatorObj<T extends Record<string, { fn: (...args: any) => any }>> = {
-  [K in keyof T]: invalidator<Parameters<T[K]["fn"]>>;
-};
+// little utilty to test inference
+const makeInvalidatorObj = <T extends Record<string, unknown>>(
+  invalidatorObj: invalidatorObj<T>,
+) => invalidatorObj;
+
+const inferredExample = makeInvalidatorObj({
+  updateName: {
+    fn: (name: string) => {},
+    genSetKey: (name: string) => `name:${name}`,
+  },
+  updateAge: {
+    fn: (age: number) => {
+      /* some biz logic */
+    },
+    genSetKey: (age: number) => `age:${age}`,
+    // ^ correctly shows type error for wrong argument type
+  },
+});
+
+type pls = typeof inferredExample;
 
 // maps invalidators to their genSetKey arg types
 export type invalidatorFnArgs<T extends invalidatorObj<any>> = {
   [K in keyof T]: Parameters<T[K]["genSetKey"]>[] | Parameters<T[K]["genSetKey"]>;
 };
 
-// just a dummy function to be able to try different args and make sure
-// TS can infer the invalidators correctly
-const makeInvalidatorObj = <T extends Record<string, { fn: (...args: any) => any }>>(
-  invalidators: invalidatorObj<T>,
-) => invalidators;
-
-const myAppleInvalidatorObj = makeInvalidatorObj({
-  updateName: {
-    fn: (name: string) => {
-      // update the name
-    },
-    genSetKey: (name: string) => `name:${name}`,
-  },
-  updateAge: {
-    fn: (age: number) => {
-      // update the age
-    },
-    genSetKey: (age: number) => `age:${age}`,
-  },
-});
-
-const myThing = makeInvaliad;
-
 type cacheableFunctionNode<
-  TInvalidatorFns extends invalidatorObj,
+  TInvalidatorFns extends invalidatorObj<any>,
   TFnArgs extends unknown[],
   TFnReturn,
 > = {
@@ -51,7 +49,7 @@ type cacheableFunctionNode<
 };
 
 const makeCacheableFunctionNode = <
-  const T extends invalidatorObj,
+  const T extends invalidatorObj<any>,
   K extends unknown[],
   J,
 >(
@@ -99,7 +97,7 @@ const myCacheableFunctionNode = makeCacheableFunctionNode({
 
 // let's see if we can make a function that takes a func node and does something with it
 export const makeCacheAware = <
-  const TParentFns extends invalidatorObj,
+  const TParentFns extends invalidatorObj<any>,
   TFnArgs extends unknown[],
   TFnReturn,
 >(
@@ -129,14 +127,16 @@ export const makeCacheAware = <
     const invalidatorArgs = await funcNode.getInvalidatorArgs(...args);
     // for each key in invalidatorArgs, call that function with its args
     for (const functionName of Object.keys(invalidatorArgs)) {
-      // generate the using the function's genKey and the generated args
-      // here's the tricky part: ...invalidatorArgs[functionName] could either be
-      // - a tuple, containing the args for one call of the function
-      // - an array of such tuples
-      // both of those are arrays, so to tell if you're dealing with an array
-      // of tuples, check to see if the first element is an array
+      // invalidatorArgs[functionName] could either be an array of arg tuples,
+      // or a single arg tuple. This is not a 100% sure way to check, but for now...
       if (Array.isArray(invalidatorArgs[functionName][0])) {
         for (const args of invalidatorArgs[functionName]) {
+          // TS is complaining because it's not sure args is iterable.
+          // I think this is happening because I just made invalidatorObj into a generic,
+          // instead of just being a record. So now TS has no idea if invalidatorFnArgs<TParentFns>
+          // is an array?? idk. But probably the last commit to not have this issue is
+          // c78da6ca51c8c7fecd36e0a8738e333e3ef831dc
+          // @ts-ignore
           const setKey = funcNode.invalidatorFns[functionName].genSetKey(...args);
           // add the primary cache key as a value under this setKey
           await cache.sadd({ set: `invset-${setKey}`, value: cacheKey });
